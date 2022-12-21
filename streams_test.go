@@ -22,7 +22,7 @@ func TestStreamCRU(t *testing.T) {
 
 	count, err := c.XLEN("x1", XStart, XEnd)
 	assert.NoError(t, err)
-	assert.Equal(t, int64(1), count)
+	assert.Equal(t, int32(1), count)
 
 	insertID2, err := c.XADD("x1", XAutoID, map[string]Value{"f3": StringValue{"v3"}, "f4": StringValue{"v4"}})
 	assert.NoError(t, err)
@@ -30,7 +30,7 @@ func TestStreamCRU(t *testing.T) {
 
 	count, err = c.XLEN("x1", XStart, XEnd)
 	assert.NoError(t, err)
-	assert.Equal(t, int64(2), count)
+	assert.Equal(t, int32(2), count)
 
 	items, err = c.XRANGE("x1", XStart, XEnd, 100)
 	assert.NoError(t, err)
@@ -98,7 +98,7 @@ func TestStreamDeletes(t *testing.T) {
 
 	deletedCount, err := c.XTRIM("x1", 2)
 	assert.NoError(t, err)
-	assert.Equal(t, int64(1), deletedCount)
+	assert.Equal(t, int32(1), deletedCount)
 
 	items, err = c.XRANGE("x1", XStart, XEnd, 100)
 	assert.NoError(t, err)
@@ -218,7 +218,7 @@ func TestStreamsConsumerGroupACK(t *testing.T) {
 	assert.Equal(t, consumer1, pendingItems[0].Consumer)
 	assert.Equal(t, consumer2, pendingItems[1].Consumer)
 	assert.Equal(t, consumer3, pendingItems[2].Consumer)
-	assert.Equal(t, int64(1), pendingItems[0].DeliveryCount)
+	assert.Equal(t, int32(1), pendingItems[0].DeliveryCount)
 	assert.GreaterOrEqual(t, pendingItems[0].LastDelivered.Unix(), nowTS)
 
 	redeliveredItem1, err := c.XREADGROUP(key, group, consumer1, XReadPending, 1)
@@ -237,8 +237,8 @@ func TestStreamsConsumerGroupACK(t *testing.T) {
 	assert.Equal(t, consumer1, pendingItems[0].Consumer)
 	assert.Equal(t, consumer2, pendingItems[1].Consumer)
 	assert.Equal(t, 3, len(pendingItems))
-	assert.Equal(t, int64(2), pendingItems[0].DeliveryCount)
-	assert.Equal(t, int64(2), pendingItems[1].DeliveryCount)
+	assert.Equal(t, int32(2), pendingItems[0].DeliveryCount)
+	assert.Equal(t, int32(2), pendingItems[1].DeliveryCount)
 
 	ackedIds, err := c.XACK(key, group, item1[0].ID, item2[0].ID)
 	assert.NoError(t, err)

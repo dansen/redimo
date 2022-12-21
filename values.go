@@ -134,6 +134,9 @@ func (rv ReturnValue) Bytes() []byte {
 // Empty returns true if the value is empty or uninitialized. This
 // indicates that the underlying DynamoDB operation did not return a value.
 func (rv ReturnValue) Empty() bool {
+	if rv.av == nil {
+		return true
+	}
 	_, ok := rv.av.(*types.AttributeValueMemberNULL)
 	return ok
 }

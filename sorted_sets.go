@@ -48,7 +48,9 @@ type zScore struct {
 
 func (zs zScore) ToAV() (av types.AttributeValue) {
 	if zs.present() {
-		av.(*types.AttributeValueMemberN).Value = strconv.FormatFloat(zs.score, 'G', 17, 64)
+		av = &types.AttributeValueMemberN{
+			Value: strconv.FormatFloat(zs.score, 'G', 17, 64),
+		}
 	}
 
 	return
@@ -64,7 +66,9 @@ type zLex struct {
 
 func (zl zLex) ToAV() (av types.AttributeValue) {
 	if zl.present() {
-		av.(*types.AttributeValueMemberS).Value = zl.lex
+		av = &types.AttributeValueMemberS{
+			Value: zl.lex,
+		}
 	}
 
 	return
@@ -75,8 +79,7 @@ func (zl zLex) present() bool {
 }
 
 func zScoreFromAV(av types.AttributeValue) float64 {
-	f, _ := strconv.ParseFloat(av.(*types.AttributeValueMemberN).Value, 64)
-	return f
+	return ReturnValue{av}.Float()
 }
 
 func (c Client) ZADD(key string, membersWithScores map[string]float64, flags Flags) (addedMembers []string, err error) {

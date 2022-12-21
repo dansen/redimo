@@ -137,7 +137,7 @@ type PendingItem struct {
 	ID            XID
 	Consumer      string
 	LastDelivered time.Time
-	DeliveryCount int64
+	DeliveryCount int32
 }
 
 func (pi PendingItem) toPutAction(key string, c Client) types.TransactWriteItem {
@@ -179,11 +179,11 @@ func (pi PendingItem) updateDeliveryAction(key string, c Client) *dynamodb.Updat
 }
 
 func parsePendingItem(avm map[string]types.AttributeValue, c Client) (pi PendingItem) {
-	pi.ID = XID(avm[c.sk].(*types.AttributeValueMemberS).Value)
-	pi.Consumer = avm[consumerKey].(*types.AttributeValueMemberS).Value
-	timestamp, _ := strconv.ParseInt(avm[lastDeliveryTimestampKey].(*types.AttributeValueMemberN).Value, 10, 64)
+	pi.ID = XID(ReturnValue{avm[c.sk]}.String())
+	pi.Consumer = ReturnValue{avm[consumerKey]}.String()
+	timestamp := ReturnValue{avm[lastDeliveryTimestampKey]}.Int()
 	pi.LastDelivered = time.Unix(timestamp, 0)
-	deliveryCount, _ := strconv.ParseInt(avm[deliveryCountKey].(*types.AttributeValueMemberN).Value, 10, 64)
+	deliveryCount := int32(ReturnValue{avm[deliveryCountKey]}.Int())
 	pi.DeliveryCount = deliveryCount
 
 	return
@@ -415,7 +415,7 @@ func (c Client) xGroupCursorGet(key string, group string) (id XID, err error) {
 		return
 	}
 
-	cursor := resp.Item[vk].(*types.AttributeValueMemberS).Value
+	cursor := ReturnValue{resp.Item[vk]}.String()
 	if cursor == "" {
 		return id, ErrXGroupNotInitialized
 	}
@@ -598,7 +598,7 @@ func parseStreamItem(item map[string]types.AttributeValue, c Client) (si StreamI
 		}
 	}
 
-	si.ID = XID(item[c.sk].(*types.AttributeValueMemberS).Value)
+	si.ID = XID(ReturnValue{item[c.sk]}.String())
 
 	return
 }

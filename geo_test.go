@@ -37,7 +37,7 @@ func TestGeoBasics(t *testing.T) {
 
 	count, err := c.ZCARD("Sicily")
 	assert.NoError(t, err)
-	assert.Equal(t, int64(2), count)
+	assert.Equal(t, int32(2), count)
 
 	geohashes, err := c.GEOHASH("Sicily", "Palermo")
 	assert.NoError(t, err)

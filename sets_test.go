@@ -33,7 +33,7 @@ func TestBasicSets(t *testing.T) {
 
 	count, err := c.SCARD("s1")
 	assert.NoError(t, err)
-	assert.Equal(t, int64(3), count)
+	assert.Equal(t, int32(3), count)
 
 	members, err = c.SMEMBERS("nosuchset")
 	assert.NoError(t, err)
@@ -57,11 +57,11 @@ func TestBasicSets(t *testing.T) {
 
 	count, err = c.SCARD("s1")
 	assert.NoError(t, err)
-	assert.Equal(t, int64(1), count)
+	assert.Equal(t, int32(1), count)
 
 	count, err = c.SCARD("nosuchkey")
 	assert.NoError(t, err)
-	assert.Equal(t, int64(0), count)
+	assert.Equal(t, int32(0), count)
 }
 
 func TestSetOperations(t *testing.T) {
@@ -82,7 +82,7 @@ func TestSetOperations(t *testing.T) {
 
 	unionCount, err := c.SUNIONSTORE("union", "s1", "s2", "s3")
 	assert.NoError(t, err)
-	assert.Equal(t, int64(7), unionCount)
+	assert.Equal(t, int32(7), unionCount)
 
 	unionMembers, err := c.SMEMBERS("union")
 	assert.NoError(t, err)
@@ -98,7 +98,7 @@ func TestSetOperations(t *testing.T) {
 
 	intersectionCount, err := c.SINTERSTORE("inter", "s1", "s2")
 	assert.NoError(t, err)
-	assert.Equal(t, int64(1), intersectionCount)
+	assert.Equal(t, int32(1), intersectionCount)
 
 	intersectionMembers, err := c.SMEMBERS("inter")
 	assert.NoError(t, err)
@@ -114,7 +114,7 @@ func TestSetOperations(t *testing.T) {
 
 	diffCount, err := c.SDIFFSTORE("diff", "s1", "s2", "s3")
 	assert.NoError(t, err)
-	assert.Equal(t, int64(2), diffCount)
+	assert.Equal(t, int32(2), diffCount)
 
 	diffMembers, err := c.SMEMBERS("diff")
 	assert.NoError(t, err)
@@ -148,7 +148,7 @@ func TestSetModifiers(t *testing.T) {
 
 	newCount, err := c.SCARD("s1")
 	assert.NoError(t, err)
-	assert.Equal(t, int64(1), newCount)
+	assert.Equal(t, int32(1), newCount)
 
 	_, err = c.SADD("s1", "m1", "m2", "m3")
 	assert.NoError(t, err)

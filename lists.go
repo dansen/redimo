@@ -212,10 +212,10 @@ func (ln listNode) deleteAction(c Client) types.TransactWriteItem {
 }
 
 func lParseNode(avm map[string]types.AttributeValue, c Client) (ln listNode) {
-	ln.key = avm[c.pk].(*types.AttributeValueMemberS).Value
-	ln.address = avm[c.sk].(*types.AttributeValueMemberS).Value
-	ln.left = avm[skLeft].(*types.AttributeValueMemberS).Value
-	ln.right = avm[skRight].(*types.AttributeValueMemberS).Value
+	ln.key = ReturnValue{avm[c.pk]}.String()
+	ln.address = ReturnValue{avm[c.sk]}.String()
+	ln.left = ReturnValue{avm[skLeft]}.String()
+	ln.right = ReturnValue{avm[skRight]}.String()
 	ln.value = ReturnValue{avm[vk]}
 
 	return

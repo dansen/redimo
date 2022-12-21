@@ -48,7 +48,7 @@ func TestBasicHashes(t *testing.T) {
 
 	count, err := c.HLEN("k1")
 	assert.NoError(t, err)
-	assert.Equal(t, int64(2), count)
+	assert.Equal(t, int32(2), count)
 
 	deletedFields, err := c.HDEL("k1", "f2", "f1")
 	assert.NoError(t, err)

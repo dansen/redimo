@@ -27,7 +27,7 @@ func TestZBasic(t *testing.T) {
 
 	count, err := c.ZCARD("z1")
 	assert.NoError(t, err)
-	assert.Equal(t, int64(4), count)
+	assert.Equal(t, int32(4), count)
 
 	_, ok, err = c.ZSCORE("z1", "nosuchmember")
 	assert.NoError(t, err)
@@ -49,7 +49,7 @@ func TestZBasic(t *testing.T) {
 
 	count, err = c.ZCARD("z1")
 	assert.NoError(t, err)
-	assert.Equal(t, int64(2), count)
+	assert.Equal(t, int32(2), count)
 
 	_, ok, err = c.ZSCORE("z1", "nosuchmember")
 	assert.NoError(t, err)
@@ -92,7 +92,7 @@ func TestZPops(t *testing.T) {
 
 	count, err := c.ZCARD("z1")
 	assert.NoError(t, err)
-	assert.Equal(t, int64(9), count)
+	assert.Equal(t, int32(9), count)
 
 	membersWithScores, err := c.ZPOPMAX("z1", 2)
 	assert.NoError(t, err)
@@ -100,7 +100,7 @@ func TestZPops(t *testing.T) {
 
 	count, err = c.ZCARD("z1")
 	assert.NoError(t, err)
-	assert.Equal(t, int64(7), count)
+	assert.Equal(t, int32(7), count)
 
 	_, ok, err := c.ZSCORE("z1", "m9")
 	assert.NoError(t, err)
@@ -116,7 +116,7 @@ func TestZPops(t *testing.T) {
 
 	count, err = c.ZCARD("z1")
 	assert.NoError(t, err)
-	assert.Equal(t, int64(5), count)
+	assert.Equal(t, int32(5), count)
 
 	_, ok, err = c.ZSCORE("z1", "m1")
 	assert.NoError(t, err)
@@ -132,7 +132,7 @@ func TestZPops(t *testing.T) {
 
 	count, err = c.ZCARD("z1")
 	assert.NoError(t, err)
-	assert.Equal(t, int64(0), count)
+	assert.Equal(t, int32(0), count)
 }
 
 func TestZRanges(t *testing.T) {
@@ -231,7 +231,7 @@ func TestZRanges(t *testing.T) {
 
 	count, err := c.ZCARD("z1")
 	assert.NoError(t, err)
-	assert.Equal(t, int64(6), count)
+	assert.Equal(t, int32(6), count)
 
 	assertAbsence(t, c, "m1", "m2", "m3")
 
@@ -244,7 +244,7 @@ func TestZRanges(t *testing.T) {
 
 	count, err = c.ZCARD("z1")
 	assert.NoError(t, err)
-	assert.Equal(t, int64(3), count)
+	assert.Equal(t, int32(3), count)
 
 	removedMembers, err = c.ZREMRANGEBYSCORE("z1", 7, 9)
 	assert.NoError(t, err)
@@ -254,7 +254,7 @@ func TestZRanges(t *testing.T) {
 
 	count, err = c.ZCARD("z1")
 	assert.NoError(t, err)
-	assert.Equal(t, int64(0), count)
+	assert.Equal(t, int32(0), count)
 }
 
 func assertAbsence(t *testing.T, c Client, members ...string) {
@@ -279,34 +279,34 @@ func TestZCounts(t *testing.T) {
 
 	count, err := c.ZCOUNT("z1", 2, 3)
 	assert.NoError(t, err)
-	assert.Equal(t, int64(2), count)
+	assert.Equal(t, int32(2), count)
 
 	count, err = c.ZCOUNT("z1", 2, math.Inf(+1))
 	assert.NoError(t, err)
-	assert.Equal(t, int64(3), count)
+	assert.Equal(t, int32(3), count)
 
 	count, err = c.ZCOUNT("z1", math.Inf(-1), math.Inf(+1))
 	assert.NoError(t, err)
-	assert.Equal(t, int64(4), count)
+	assert.Equal(t, int32(4), count)
 
 	count, err = c.ZLEXCOUNT("z1", "m2", "m4")
 	assert.NoError(t, err)
-	assert.Equal(t, int64(3), count)
+	assert.Equal(t, int32(3), count)
 
 	rank, ok, err := c.ZRANK("z1", "m2")
 	assert.NoError(t, err)
 	assert.True(t, ok)
-	assert.Equal(t, int64(1), rank)
+	assert.Equal(t, int32(1), rank)
 
 	rank, ok, err = c.ZRANK("z1", "m4")
 	assert.NoError(t, err)
 	assert.True(t, ok)
-	assert.Equal(t, int64(3), rank)
+	assert.Equal(t, int32(3), rank)
 
 	rank, ok, err = c.ZREVRANK("z1", "m4")
 	assert.NoError(t, err)
 	assert.True(t, ok)
-	assert.Equal(t, int64(0), rank)
+	assert.Equal(t, int32(0), rank)
 }
 
 func TestZAggregations(t *testing.T) {

@@ -6,7 +6,6 @@ import (
 	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/aws/protocol/restjson"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 )
@@ -196,8 +195,8 @@ type itemDef struct {
 
 func parseKey(avm map[string]types.AttributeValue, c Client) keyDef {
 	return keyDef{
-		pk: avm[c.pk].(*types.AttributeValueMemberS).Value,
-		sk: avm[c.sk].(*types.AttributeValueMemberS).Value,
+		pk: ReturnValue{avm[c.pk]}.String(),
+		sk: ReturnValue{avm[c.sk]}.String(),
 	}
 }
 
@@ -233,13 +232,21 @@ func conditionFailureError(err error) bool {
 	if err == nil {
 		return false
 	}
+	s := err.Error()
 
-	errorCode := restjson.SanitizeErrorCode(err.Error())
-	switch errorCode {
-	case "ConditionalCheckFailedException",
-		"TransactionInProgressException",
-		"TransactionConflictException",
-		"TransactionCanceledException":
+	if strings.Contains(s, "ConditionalCheckFailedException") {
+		return true
+	}
+
+	if strings.Contains(s, "TransactionInProgressException") {
+		return true
+	}
+
+	if strings.Contains(s, "TransactionConflictException") {
+		return true
+	}
+
+	if strings.Contains(s, "TransactionCanceledException") {
 		return true
 	}
 
