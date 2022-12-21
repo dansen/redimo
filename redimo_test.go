@@ -84,7 +84,7 @@ func newConfig(t *testing.T) aws.Config {
 		if service == dynamodb.ServiceID {
 			return aws.Endpoint{
 				PartitionID:   "aws",
-				URL:           "http://test.vr-cat.com:19981",
+				URL:           "http://localhost:8000",
 				SigningRegion: region,
 			}, nil
 		}
