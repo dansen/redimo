@@ -4,6 +4,7 @@ go 1.14
 
 require (
 	github.com/aws/aws-sdk-go-v2 v1.17.3
+	github.com/aws/aws-sdk-go-v2/config v1.18.7 // indirect
 	github.com/aws/aws-sdk-go-v2/service/dynamodb v1.17.9 // indirect
 	github.com/go-sql-driver/mysql v1.5.0 // indirect
 	github.com/golang/geo v0.0.0-20200319012246-673a6f80352d
