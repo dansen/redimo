@@ -2,7 +2,6 @@ package redimo
 
 import (
 	"context"
-	"fmt"
 	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -28,14 +27,9 @@ func (c Client) HGET(key string, field string) (val ReturnValue, err error) {
 }
 
 func (c Client) HSET(key string, data interface{}) (newlySavedFields map[string]Value, err error) {
-	var fieldValues = make(map[string]Value)
-	switch data := data.(type) {
-	case map[string]interface{}:
-		fieldValues = ToValueMap(data)
-	case map[string]Value:
-		fieldValues = data
-	default:
-		return newlySavedFields, fmt.Errorf("invalid type %T", data)
+	fieldValues, err := ToValueMapE(data)
+	if err != nil {
+		return newlySavedFields, err
 	}
 
 	newlySavedFields = make(map[string]Value)
@@ -67,14 +61,9 @@ func (c Client) HSET(key string, data interface{}) (newlySavedFields map[string]
 }
 
 func (c Client) HMSET(key string, data interface{}) (err error) {
-	var fieldValues = make(map[string]Value)
-	switch data := data.(type) {
-	case map[string]interface{}:
-		fieldValues = ToValueMap(data)
-	case map[string]Value:
-		fieldValues = data
-	default:
-		return fmt.Errorf("invalid type %T", data)
+	fieldValues, err := ToValueMapE(data)
+	if err != nil {
+		return err
 	}
 
 	items := make([]types.TransactWriteItem, 0, len(fieldValues))

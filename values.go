@@ -26,53 +26,83 @@ type Value interface {
 	ToAV() types.AttributeValue
 }
 
-func ToValue(v interface{}) Value {
-	switch v := v.(type) {
+func ToValueE(data interface{}) (value Value, err error) {
+	switch data := data.(type) {
+	case StringValue:
+		value = data
+	case BytesValue:
+		value = data
+	case IntValue:
+		value = data
+	case FloatValue:
+		value = data
 	case string:
-		return StringValue{v}
+		value = StringValue{data}
 	case []byte:
-		return BytesValue{v}
+		value = BytesValue{data}
 	case int:
-		return IntValue{int64(v)}
+		value = IntValue{int64(data)}
 	case int8:
-		return IntValue{int64(v)}
+		value = IntValue{int64(data)}
 	case int16:
-		return IntValue{int64(v)}
+		value = IntValue{int64(data)}
 	case int32:
-		return IntValue{int64(v)}
+		value = IntValue{int64(data)}
 	case int64:
-		return IntValue{int64(v)}
+		value = IntValue{int64(data)}
 	case uint:
-		return IntValue{int64(v)}
+		value = IntValue{int64(data)}
 	case uint8:
-		return IntValue{int64(v)}
+		value = IntValue{int64(data)}
 	case uint16:
-		return IntValue{int64(v)}
+		value = IntValue{int64(data)}
 	case uint32:
-		return IntValue{int64(v)}
+		value = IntValue{int64(data)}
 	case uint64:
-		return IntValue{int64(v)}
+		value = IntValue{int64(data)}
 	case float32:
-		return FloatValue{float64(v)}
+		value = FloatValue{float64(data)}
 	case float64:
-		return FloatValue{float64(v)}
+		value = FloatValue{float64(data)}
 	default:
-		panic(fmt.Errorf("ToValue: unsupported type: %s", reflect.TypeOf(v).String()))
+		err = fmt.Errorf("ToValue: unsupported type: %T", data)
 	}
+	return value, err
 }
 
-func ToValues(vs []interface{}) []Value {
-	values := make([]Value, len(vs))
-	for i, v := range vs {
-		values[i] = ToValue(v)
+func ToValue(data interface{}) Value {
+	value, err := ToValueE(data)
+	if err != nil {
+		panic(err)
 	}
-	return values
+	return value
 }
 
-func ToValueMap(m map[string]interface{}) map[string]Value {
-	values := make(map[string]Value, len(m))
-	for k, v := range m {
-		values[k] = ToValue(v)
+func ToValueMapE(data interface{}) (map[string]Value, error) {
+	var valueMap map[string]Value
+	switch data := data.(type) {
+	case map[string]interface{}:
+		valueMap = make(map[string]Value, len(data))
+		for k, v := range data {
+			value, err := ToValueE(v)
+			if err != nil {
+				return nil, err
+			}
+			valueMap[k] = value
+		}
+	case map[string]Value:
+		valueMap = data
+	default:
+		return valueMap, fmt.Errorf("ToValueMapE: unsupported type: %T", data)
+	}
+
+	return valueMap, nil
+}
+
+func ToValueMap(data interface{}) map[string]Value {
+	values, err := ToValueMapE(data)
+	if err != nil {
+		panic(err)
 	}
 	return values
 }

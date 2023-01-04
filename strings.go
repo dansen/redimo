@@ -2,7 +2,6 @@ package redimo
 
 import (
 	"context"
-	"fmt"
 	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -37,7 +36,11 @@ func (c Client) GET(key string) (val ReturnValue, err error) {
 // the SET becomes conditional and will return false if the condition fails.
 //
 // Works similar to https://redis.io/commands/set
-func (c Client) SET(key string, value Value, flags ...Flag) (ok bool, err error) {
+func (c Client) SET(key string, data interface{}, flags ...Flag) (ok bool, err error) {
+	value, err := ToValueE(data)
+	if err != nil {
+		return
+	}
 	builder := newExpresionBuilder()
 
 	builder.updateSET(vk, value)
@@ -152,14 +155,11 @@ func (c Client) MGET(keys ...string) (values map[string]ReturnValue, err error) 
 //
 // Works similar to https://redis.io/commands/mset
 func (c Client) MSET(data interface{}) (err error) {
-	switch v := data.(type) {
-	case map[string]Value:
-		_, err = c.mset(v, Flags{})
-	case map[string]interface{}:
-		_, err = c.mset(ToValueMap(v), Flags{})
-	default:
-		err = fmt.Errorf("invalid type %T", data)
+	fields, err := ToValueMapE(data)
+	if err != nil {
+		return err
 	}
+	_, err = c.mset(fields, Flags{})
 	return err
 }
 
@@ -168,14 +168,12 @@ func (c Client) MSET(data interface{}) (err error) {
 //
 // Works similar to https://redis.io/commands/msetnx
 func (c Client) MSETNX(data interface{}) (ok bool, err error) {
-	switch v := data.(type) {
-	case map[string]Value:
-		ok, err = c.mset(v, Flags{IfNotExists})
-	case map[string]interface{}:
-		ok, err = c.mset(ToValueMap(v), Flags{IfNotExists})
-	default:
-		err = fmt.Errorf("invalid type %T", data)
+	fields, err := ToValueMapE(data)
+	if err != nil {
+		return ok, err
 	}
+
+	ok, err = c.mset(fields, Flags{IfNotExists})
 	return
 }
 
