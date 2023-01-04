@@ -2,6 +2,7 @@ package redimo
 
 import (
 	"context"
+	"fmt"
 	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -148,17 +149,32 @@ func (c Client) MGET(keys ...string) (values map[string]ReturnValue, err error) 
 // See https://docs.aws.amazon.com/amazondynamodb/latest/APIReference/API_TransactWriteItems.html
 //
 // Works similar to https://redis.io/commands/mset
-func (c Client) MSET(data map[string]Value) (err error) {
-	_, err = c.mset(data, Flags{})
-	return
+func (c Client) MSET(data interface{}) (err error) {
+	switch v := data.(type) {
+	case map[string]Value:
+		_, err = c.mset(v, Flags{})
+	case map[string]interface{}:
+		_, err = c.mset(ToValueMap(v), Flags{})
+	default:
+		err = fmt.Errorf("invalid type %T", data)
+	}
+	return err
 }
 
 // MSETNX sets the given keys and values atomically in a transaction, but only if none of the given
 // keys exist. If one or more of the keys already exist, nothing will be changed and MSETNX will return false.
 //
 // Works similar to https://redis.io/commands/msetnx
-func (c Client) MSETNX(data map[string]Value) (ok bool, err error) {
-	return c.mset(data, Flags{IfNotExists})
+func (c Client) MSETNX(data interface{}) (ok bool, err error) {
+	switch v := data.(type) {
+	case map[string]Value:
+		ok, err = c.mset(v, Flags{IfNotExists})
+	case map[string]interface{}:
+		ok, err = c.mset(ToValueMap(v), Flags{IfNotExists})
+	default:
+		err = fmt.Errorf("invalid type %T", data)
+	}
+	return
 }
 
 func (c Client) mset(data map[string]Value, flags Flags) (ok bool, err error) {

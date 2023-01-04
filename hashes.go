@@ -2,6 +2,7 @@ package redimo
 
 import (
 	"context"
+	"fmt"
 	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -26,10 +27,20 @@ func (c Client) HGET(key string, field string) (val ReturnValue, err error) {
 	return
 }
 
-func (c Client) HSET(key string, fieldValues map[string]Value) (newlySavedFields map[string]Value, err error) {
+func (c Client) HSET(key string, fieldValues interface{}) (newlySavedFields map[string]Value, err error) {
+	var vFieldValues = make(map[string]Value)
+	switch fieldValues := fieldValues.(type) {
+	case map[string]interface{}:
+		vFieldValues = ToValueMap(fieldValues)
+	case map[string]Value:
+		vFieldValues = fieldValues
+	default:
+		return newlySavedFields, fmt.Errorf("invalid type %T", data)
+	}
+
 	newlySavedFields = make(map[string]Value)
 
-	for field, value := range fieldValues {
+	for field, value := range vFieldValues {
 		builder := newExpresionBuilder()
 		builder.updateSetAV(vk, value.ToAV())
 
@@ -55,10 +66,20 @@ func (c Client) HSET(key string, fieldValues map[string]Value) (newlySavedFields
 	return
 }
 
-func (c Client) HMSET(key string, fieldValues map[string]Value) (err error) {
-	items := make([]types.TransactWriteItem, 0, len(fieldValues))
+func (c Client) HMSET(key string, fieldValues interface{}) (err error) {
+	var vFieldValues = make(map[string]Value)
+	switch fieldValues := fieldValues.(type) {
+	case map[string]interface{}:
+		vFieldValues = ToValueMap(fieldValues)
+	case map[string]Value:
+		vFieldValues = fieldValues
+	default:
+		return fmt.Errorf("invalid type %T", data)
+	}
 
-	for field, v := range fieldValues {
+	items := make([]types.TransactWriteItem, 0, len(vFieldValues))
+
+	for field, v := range vFieldValues {
 		builder := newExpresionBuilder()
 		builder.updateSET(vk, v)
 

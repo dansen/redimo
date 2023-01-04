@@ -6,7 +6,6 @@ import (
 	"reflect"
 	"strconv"
 
-	"github.com/aura-studio/redimo.go"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 )
 
@@ -30,13 +29,13 @@ type Value interface {
 func ToValue(v interface{}) Value {
 	switch v := v.(type) {
 	case string:
-		return redimo.StringValue{v}
+		return StringValue{v}
 	case []byte:
-		return redimo.BytesValue{v}
+		return BytesValue{v}
 	case int, int8, int16, int32, int64, uint, uint8, uint16, uint32, uint64:
-		return redimo.IntValue{v}
+		return IntValue{v}
 	case float32, float64:
-		return redimo.FloatValue{v}
+		return FloatValue{v}
 	default:
 		panic(fmt.Errorf("ToValue: unsupported type: %s", reflect.TypeOf(v).String()))
 	}
