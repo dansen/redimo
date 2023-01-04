@@ -42,6 +42,22 @@ func ToValue(v interface{}) Value {
 	}
 }
 
+func ToValues(vs []interface{}) []Value {
+	values := make([]Value, len(vs))
+	for i, v := range vs {
+		values[i] = ToValue(v)
+	}
+	return values
+}
+
+func ToValueMap(m map[string]interface{}) map[string]Value {
+	values := make(map[string]Value, len(m))
+	for k, v := range m {
+		values[k] = ToValue(v)
+	}
+	return values
+}
+
 // StringValue is a convenience value wrapper for a string, usable as
 //
 //	StringValue{"hello"}
