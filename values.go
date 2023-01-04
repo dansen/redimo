@@ -32,10 +32,30 @@ func ToValue(v interface{}) Value {
 		return StringValue{v}
 	case []byte:
 		return BytesValue{v}
-	case int, int8, int16, int32, int64, uint, uint8, uint16, uint32, uint64:
-		return IntValue{v}
-	case float32, float64:
-		return FloatValue{v}
+	case int:
+		return IntValue{int64(v)}
+	case int8:
+		return IntValue{int64(v)}
+	case int16:
+		return IntValue{int64(v)}
+	case int32:
+		return IntValue{int64(v)}
+	case int64:
+		return IntValue{int64(v)}
+	case uint:
+		return IntValue{int64(v)}
+	case uint8:
+		return IntValue{int64(v)}
+	case uint16:
+		return IntValue{int64(v)}
+	case uint32:
+		return IntValue{int64(v)}
+	case uint64:
+		return IntValue{int64(v)}
+	case float32:
+		return FloatValue{float64(v)}
+	case float64:
+		return FloatValue{float64(v)}
 	default:
 		panic(fmt.Errorf("ToValue: unsupported type: %s", reflect.TypeOf(v).String()))
 	}

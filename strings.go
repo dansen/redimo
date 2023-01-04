@@ -37,17 +37,19 @@ func (c Client) GET(key string) (val ReturnValue, err error) {
 // the SET becomes conditional and will return false if the condition fails.
 //
 // Works similar to https://redis.io/commands/set
-func (c Client) SET(key string, value Value, flag Flag) (ok bool, err error) {
+func (c Client) SET(key string, value Value, flags ...Flag) (ok bool, err error) {
 	builder := newExpresionBuilder()
 
 	builder.updateSET(vk, value)
 
-	if flag == IfNotExists {
-		builder.addConditionNotExists(c.pk)
-	}
+	for _, flag := range flags {
+		if flag == IfNotExists {
+			builder.addConditionNotExists(c.pk)
+		}
 
-	if flag == IfAlreadyExists {
-		builder.addConditionExists(c.pk)
+		if flag == IfAlreadyExists {
+			builder.addConditionExists(c.pk)
+		}
 	}
 
 	_, err = c.ddbClient.UpdateItem(context.TODO(), &dynamodb.UpdateItemInput{

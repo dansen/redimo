@@ -27,20 +27,20 @@ func (c Client) HGET(key string, field string) (val ReturnValue, err error) {
 	return
 }
 
-func (c Client) HSET(key string, fieldValues interface{}) (newlySavedFields map[string]Value, err error) {
-	var vFieldValues = make(map[string]Value)
-	switch fieldValues := fieldValues.(type) {
+func (c Client) HSET(key string, data interface{}) (newlySavedFields map[string]Value, err error) {
+	var fieldValues = make(map[string]Value)
+	switch data := data.(type) {
 	case map[string]interface{}:
-		vFieldValues = ToValueMap(fieldValues)
+		fieldValues = ToValueMap(data)
 	case map[string]Value:
-		vFieldValues = fieldValues
+		fieldValues = data
 	default:
 		return newlySavedFields, fmt.Errorf("invalid type %T", data)
 	}
 
 	newlySavedFields = make(map[string]Value)
 
-	for field, value := range vFieldValues {
+	for field, value := range fieldValues {
 		builder := newExpresionBuilder()
 		builder.updateSetAV(vk, value.ToAV())
 
@@ -66,20 +66,20 @@ func (c Client) HSET(key string, fieldValues interface{}) (newlySavedFields map[
 	return
 }
 
-func (c Client) HMSET(key string, fieldValues interface{}) (err error) {
-	var vFieldValues = make(map[string]Value)
-	switch fieldValues := fieldValues.(type) {
+func (c Client) HMSET(key string, data interface{}) (err error) {
+	var fieldValues = make(map[string]Value)
+	switch data := data.(type) {
 	case map[string]interface{}:
-		vFieldValues = ToValueMap(fieldValues)
+		fieldValues = ToValueMap(data)
 	case map[string]Value:
-		vFieldValues = fieldValues
+		fieldValues = data
 	default:
 		return fmt.Errorf("invalid type %T", data)
 	}
 
-	items := make([]types.TransactWriteItem, 0, len(vFieldValues))
+	items := make([]types.TransactWriteItem, 0, len(fieldValues))
 
-	for field, v := range vFieldValues {
+	for field, v := range fieldValues {
 		builder := newExpresionBuilder()
 		builder.updateSET(vk, v)
 
