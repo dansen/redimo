@@ -21,7 +21,7 @@ func TestClientBuilder(t *testing.T) {
 	assert.Equal(t, "redimo", c1.tableName)
 	assert.Equal(t, c1.partitionKey, c1.partitionKey)
 	assert.False(t, c1.EventuallyConsistent().consistentReads)
-	c2 := c1.Table("table2", "index2").EventuallyConsistent()
+	c2 := c1.Table("table2").Index("index2").EventuallyConsistent()
 	assert.Equal(t, "table2", c2.tableName)
 	assert.Equal(t, "index2", c2.indexName)
 	assert.False(t, c2.consistentReads)
@@ -74,7 +74,7 @@ func newClient(t *testing.T) Client {
 	})
 	assert.NoError(t, err)
 
-	return NewClient(dynamoService).Table(tableName, indexName).Attributes(partitionKey, sortKey, sortKeyNum)
+	return NewClient(dynamoService).Table(tableName).Index(indexName).Attributes(partitionKey, sortKey, sortKeyNum)
 }
 
 func newConfig(t *testing.T) aws.Config {
