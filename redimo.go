@@ -50,21 +50,21 @@ func (c Client) StronglyConsistent() Client {
 	return c
 }
 
-func (c Client) ExistsTable() bool {
+func (c Client) ExistsTable() (bool, error) {
 	_, err := c.ddbClient.DescribeTable(context.TODO(), &dynamodb.DescribeTableInput{
 		TableName: aws.String(c.tableName),
 	})
 	if err == nil {
-		return true
+		return true, nil
 	}
 	var notFoundEx *types.ResourceNotFoundException
 	if errors.As(err, &notFoundEx) {
-		return false
+		return false, nil
 	}
-	panic(fmt.Sprintf("couldn't determine existence of table %v. Here's why: %s", c.tableName, err.Error()))
+	return false, fmt.Errorf("couldn't determine existence of table %v. Here's why: %w", c.tableName, err)
 }
 
-func (c Client) CreateTable() {
+func (c Client) CreateTable() error {
 	_, err := c.ddbClient.CreateTable(context.TODO(), &dynamodb.CreateTableInput{
 		AttributeDefinitions: []types.AttributeDefinition{
 			{AttributeName: aws.String(c.partitionKey), AttributeType: "S"},
@@ -99,9 +99,8 @@ func (c Client) CreateTable() {
 		TableName:           aws.String(c.tableName),
 		Tags:                nil,
 	})
-	if err != nil {
-		panic(fmt.Sprintf("couldn't create table %v. Here's why: %s", c.tableName, err.Error()))
-	}
+
+	return fmt.Errorf("couldn't create table %v. Here's why: %w", c.tableName, err)
 }
 
 func NewClient(service *dynamodb.Client) Client {
