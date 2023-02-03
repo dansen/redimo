@@ -2,6 +2,7 @@ package redimo
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -49,7 +50,21 @@ func (c Client) StronglyConsistent() Client {
 	return c
 }
 
-func (c Client) CreateTable(tableName string) {
+func (c Client) ExistsTable() bool {
+	_, err := c.ddbClient.DescribeTable(context.TODO(), &dynamodb.DescribeTableInput{
+		TableName: aws.String(c.tableName),
+	})
+	if err == nil {
+		return true
+	}
+	var notFoundEx *types.ResourceNotFoundException
+	if errors.As(err, &notFoundEx) {
+		return false
+	}
+	panic(fmt.Sprintf("couldn't determine existence of table %v. Here's why: %s", c.tableName, err.Error()))
+}
+
+func (c Client) CreateTable() {
 	_, err := c.ddbClient.CreateTable(context.TODO(), &dynamodb.CreateTableInput{
 		AttributeDefinitions: []types.AttributeDefinition{
 			{AttributeName: aws.String(c.partitionKey), AttributeType: "S"},
@@ -81,11 +96,11 @@ func (c Client) CreateTable(tableName string) {
 		},
 		SSESpecification:    nil,
 		StreamSpecification: nil,
-		TableName:           aws.String(tableName),
+		TableName:           aws.String(c.tableName),
 		Tags:                nil,
 	})
 	if err != nil {
-		panic(err)
+		panic(fmt.Sprintf("couldn't create table %v. Here's why: %s", c.tableName, err.Error()))
 	}
 }
 
