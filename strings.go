@@ -47,11 +47,11 @@ func (c Client) SET(key string, data interface{}, flags ...Flag) (ok bool, err e
 
 	for _, flag := range flags {
 		if flag == IfNotExists {
-			builder.addConditionNotExists(c.pk)
+			builder.addConditionNotExists(c.partitionKey)
 		}
 
 		if flag == IfAlreadyExists {
-			builder.addConditionExists(c.pk)
+			builder.addConditionExists(c.partitionKey)
 		}
 	}
 
@@ -128,7 +128,7 @@ func (c Client) MGET(keys ...string) (values map[string]ReturnValue, err error) 
 					pk: key,
 					sk: emptySK,
 				}.toAV(c),
-				ProjectionExpression: aws.String(strings.Join([]string{vk, c.pk}, ", ")),
+				ProjectionExpression: aws.String(strings.Join([]string{vk, c.partitionKey}, ", ")),
 				TableName:            aws.String(c.table),
 			},
 		}
@@ -184,7 +184,7 @@ func (c Client) mset(data map[string]Value, flags Flags) (ok bool, err error) {
 		builder := newExpresionBuilder()
 
 		if flags.has(IfNotExists) {
-			builder.addConditionNotExists(c.pk)
+			builder.addConditionNotExists(c.partitionKey)
 		}
 
 		builder.updateSET(vk, v)

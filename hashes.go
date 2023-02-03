@@ -104,7 +104,7 @@ func (c Client) HMGET(key string, fields ...string) (values map[string]ReturnVal
 				pk: key,
 				sk: field,
 			}.toAV(c),
-			ProjectionExpression: aws.String(strings.Join([]string{c.sk, vk}, ", ")),
+			ProjectionExpression: aws.String(strings.Join([]string{c.sortKey, vk}, ", ")),
 			TableName:            aws.String(c.table),
 		}}
 	}
@@ -152,7 +152,7 @@ func (c Client) HEXISTS(key string, field string) (exists bool, err error) {
 			pk: key,
 			sk: field,
 		}.toAV(c),
-		ProjectionExpression: aws.String(strings.Join([]string{c.pk}, ", ")),
+		ProjectionExpression: aws.String(strings.Join([]string{c.partitionKey}, ", ")),
 		TableName:            aws.String(c.table),
 	})
 	if err == nil && len(resp.Item) > 0 {
@@ -170,7 +170,7 @@ func (c Client) HGETALL(key string) (fieldValues map[string]ReturnValue, err err
 
 	for hasMoreResults {
 		builder := newExpresionBuilder()
-		builder.addConditionEquality(c.pk, StringValue{key})
+		builder.addConditionEquality(c.partitionKey, StringValue{key})
 
 		resp, err := c.ddbClient.Query(context.TODO(), &dynamodb.QueryInput{
 			ConsistentRead:            aws.Bool(c.consistentReads),
@@ -247,7 +247,7 @@ func (c Client) HKEYS(key string) (keys []string, err error) {
 
 	for hasMoreResults {
 		builder := newExpresionBuilder()
-		builder.addConditionEquality(c.pk, StringValue{key})
+		builder.addConditionEquality(c.partitionKey, StringValue{key})
 
 		resp, err := c.ddbClient.Query(context.TODO(), &dynamodb.QueryInput{
 			ConsistentRead:            aws.Bool(c.consistentReads),
@@ -256,7 +256,7 @@ func (c Client) HKEYS(key string) (keys []string, err error) {
 			ExpressionAttributeValues: builder.expressionAttributeValues(),
 			KeyConditionExpression:    builder.conditionExpression(),
 			TableName:                 aws.String(c.table),
-			ProjectionExpression:      aws.String(c.sk),
+			ProjectionExpression:      aws.String(c.sortKey),
 			Select:                    types.SelectSpecificAttributes,
 		})
 
@@ -297,7 +297,7 @@ func (c Client) HLEN(key string) (count int32, err error) {
 
 	for hasMoreResults {
 		builder := newExpresionBuilder()
-		builder.addConditionEquality(c.pk, StringValue{key})
+		builder.addConditionEquality(c.partitionKey, StringValue{key})
 
 		resp, err := c.ddbClient.Query(context.TODO(), &dynamodb.QueryInput{
 			ConsistentRead:            aws.Bool(c.consistentReads),
@@ -328,7 +328,7 @@ func (c Client) HLEN(key string) (count int32, err error) {
 func (c Client) HSETNX(key string, field string, value Value) (ok bool, err error) {
 	builder := newExpresionBuilder()
 	builder.updateSET(vk, value)
-	builder.addConditionNotExists(c.pk)
+	builder.addConditionNotExists(c.partitionKey)
 
 	_, err = c.ddbClient.UpdateItem(context.TODO(), &dynamodb.UpdateItemInput{
 		ConditionExpression:       builder.conditionExpression(),

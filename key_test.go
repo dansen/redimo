@@ -9,6 +9,10 @@ import (
 func TestBasicKey(t *testing.T) {
 	c := newClient(t)
 
+	val, err := c.GET("hello")
+	assert.NoError(t, err)
+	assert.False(t, val.Present())
+
 	savedFields, err := c.HSET("k1", map[string]Value{"f1": StringValue{"v1"}, "f2": StringValue{"v2"}})
 	assert.NoError(t, err)
 	assert.EqualValues(t, 2, len(savedFields))

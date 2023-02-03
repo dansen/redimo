@@ -85,14 +85,14 @@ func zScoreFromAV(av types.AttributeValue) float64 {
 func (c Client) ZADD(key string, membersWithScores map[string]float64, flags Flags) (addedMembers []string, err error) {
 	for member, score := range membersWithScores {
 		builder := newExpresionBuilder()
-		builder.updateSetAV(c.skN, zScore{score}.ToAV())
+		builder.updateSetAV(c.sortKeyNum, zScore{score}.ToAV())
 
 		if flags.has(IfNotExists) {
-			builder.addConditionNotExists(c.pk)
+			builder.addConditionNotExists(c.partitionKey)
 		}
 
 		if flags.has(IfAlreadyExists) {
-			builder.addConditionExists(c.pk)
+			builder.addConditionExists(c.partitionKey)
 		}
 
 		resp, err := c.ddbClient.UpdateItem(context.TODO(), &dynamodb.UpdateItemInput{
@@ -125,12 +125,12 @@ func (c Client) ZCARD(key string) (count int32, err error) {
 }
 
 func (c Client) ZCOUNT(key string, minScore, maxScore float64) (count int32, err error) {
-	return c.zGeneralCount(key, zScore{minScore}, zScore{maxScore}, c.skN)
+	return c.zGeneralCount(key, zScore{minScore}, zScore{maxScore}, c.sortKeyNum)
 }
 
 func (c Client) zGeneralCount(key string, min rangeCap, max rangeCap, attribute string) (count int32, err error) {
 	builder := newExpresionBuilder()
-	builder.addConditionEquality(c.pk, StringValue{key})
+	builder.addConditionEquality(c.partitionKey, StringValue{key})
 
 	betweenRange := min.present() && max.present()
 
@@ -160,7 +160,7 @@ func (c Client) zGeneralCount(key string, min rangeCap, max rangeCap, attribute 
 
 	var queryIndex *string
 
-	if attribute == c.skN {
+	if attribute == c.sortKeyNum {
 		queryIndex = aws.String(c.index)
 	}
 
@@ -194,7 +194,7 @@ func (c Client) zGeneralCount(key string, min rangeCap, max rangeCap, attribute 
 
 func (c Client) ZINCRBY(key string, member string, delta float64) (newScore float64, err error) {
 	builder := newExpresionBuilder()
-	builder.keys[c.skN] = struct{}{}
+	builder.keys[c.sortKeyNum] = struct{}{}
 	builder.values["delta"] = zScore{delta}.ToAV()
 
 	resp, err := c.ddbClient.UpdateItem(context.TODO(), &dynamodb.UpdateItemInput{
@@ -207,13 +207,13 @@ func (c Client) ZINCRBY(key string, member string, delta float64) (newScore floa
 		}.toAV(c),
 		ReturnValues:     types.ReturnValueAllNew,
 		TableName:        aws.String(c.table),
-		UpdateExpression: aws.String(fmt.Sprintf("ADD #%v :delta", c.skN)),
+		UpdateExpression: aws.String(fmt.Sprintf("ADD #%v :delta", c.sortKeyNum)),
 	})
 	if err != nil {
 		return newScore, err
 	}
 
-	newScore = zScoreFromAV(resp.Attributes[c.skN])
+	newScore = zScoreFromAV(resp.Attributes[c.sortKeyNum])
 
 	return
 }
@@ -228,7 +228,7 @@ func (c Client) ZINTERSTORE(destinationKey string, sourceKeys []string, aggregat
 }
 
 func (c Client) ZLEXCOUNT(key string, min string, max string) (count int32, err error) {
-	return c.zGeneralCount(key, zLex{min}, zLex{max}, c.sk)
+	return c.zGeneralCount(key, zLex{min}, zLex{max}, c.sortKey)
 }
 
 func (c Client) ZPOPMAX(key string, count int32) (membersWithScores map[string]float64, err error) {
@@ -243,7 +243,7 @@ var negInf = zScore{math.Inf(-1)}
 var posInf = zScore{math.Inf(+1)}
 
 func (c Client) zPop(key string, count int32, forward bool) (membersWithScores map[string]float64, err error) {
-	membersWithScores, err = c.zGeneralRange(key, negInf, posInf, 0, count, forward, c.skN)
+	membersWithScores, err = c.zGeneralRange(key, negInf, posInf, 0, count, forward, c.sortKeyNum)
 	if err != nil {
 		return
 	}
@@ -270,19 +270,19 @@ func (c Client) ZRANGE(key string, start, stop int32) (membersWithScores map[str
 
 func (c Client) zRange(key string, start int32, stop int32, forward bool) (membersWithScores map[string]float64, err error) {
 	if start < 0 && stop < 0 {
-		return c.zGeneralRange(key, negInf, posInf, -stop-1, -start, !forward, c.skN)
+		return c.zGeneralRange(key, negInf, posInf, -stop-1, -start, !forward, c.sortKeyNum)
 	}
 
 	if start > 0 && stop < 0 {
-		lastScore, err := c.zGeneralRange(key, negInf, posInf, -stop-1, 1, !forward, c.skN)
+		lastScore, err := c.zGeneralRange(key, negInf, posInf, -stop-1, 1, !forward, c.sortKeyNum)
 		if err != nil {
 			return membersWithScores, err
 		}
 
-		return c.zGeneralRange(key, negInf, zScore{floatValues(lastScore)[0]}, start, 0, forward, c.skN)
+		return c.zGeneralRange(key, negInf, zScore{floatValues(lastScore)[0]}, start, 0, forward, c.sortKeyNum)
 	}
 
-	return c.zGeneralRange(key, negInf, posInf, start, stop-start+1, forward, c.skN)
+	return c.zGeneralRange(key, negInf, posInf, start, stop-start+1, forward, c.sortKeyNum)
 }
 
 func floatValues(floatValuedMap map[string]float64) (values []float64) {
@@ -294,11 +294,11 @@ func floatValues(floatValuedMap map[string]float64) (values []float64) {
 }
 
 func (c Client) ZRANGEBYLEX(key string, min, max string, offset, count int32) (membersWithScores map[string]float64, err error) {
-	return c.zGeneralRange(key, zLex{min}, zLex{max}, offset, count, true, c.sk)
+	return c.zGeneralRange(key, zLex{min}, zLex{max}, offset, count, true, c.sortKey)
 }
 
 func (c Client) ZRANGEBYSCORE(key string, min, max float64, offset, count int32) (membersWithScores map[string]float64, err error) {
-	return c.zGeneralRange(key, zScore{min}, zScore{max}, offset, count, true, c.skN)
+	return c.zGeneralRange(key, zScore{min}, zScore{max}, offset, count, true, c.sortKeyNum)
 }
 
 func (c Client) zGeneralRange(key string,
@@ -319,7 +319,7 @@ func (c Client) zGeneralRange(key string,
 		}
 
 		builder := newExpresionBuilder()
-		builder.addConditionEquality(c.pk, StringValue{key})
+		builder.addConditionEquality(c.partitionKey, StringValue{key})
 
 		if start.present() {
 			builder.values["start"] = start.ToAV()
@@ -339,7 +339,7 @@ func (c Client) zGeneralRange(key string,
 		}
 
 		var queryIndex *string
-		if attribute == c.skN {
+		if attribute == c.sortKeyNum {
 			queryIndex = aws.String(c.index)
 		}
 
@@ -362,7 +362,7 @@ func (c Client) zGeneralRange(key string,
 		for _, item := range resp.Items {
 			if index >= offset {
 				pi := parseItem(item, c)
-				membersWithScores[pi.sk] = zScoreFromAV(item[c.skN])
+				membersWithScores[pi.sk] = zScoreFromAV(item[c.sortKeyNum])
 				remainingCount--
 			}
 			index++
@@ -391,9 +391,9 @@ func (c Client) zRank(key string, member string, forward bool) (rank int32, ok b
 	var count int32
 
 	if forward {
-		count, err = c.zGeneralCount(key, negInf, zScore{score}, c.skN)
+		count, err = c.zGeneralCount(key, negInf, zScore{score}, c.sortKeyNum)
 	} else {
-		count, err = c.zGeneralCount(key, zScore{score}, posInf, c.skN)
+		count, err = c.zGeneralCount(key, zScore{score}, posInf, c.sortKeyNum)
 	}
 
 	if err == nil {
@@ -464,11 +464,11 @@ func (c Client) ZREVRANGE(key string, start, stop int32) (membersWithScores map[
 }
 
 func (c Client) ZREVRANGEBYLEX(key string, max, min string, offset, count int32) (membersWithScores map[string]float64, err error) {
-	return c.zGeneralRange(key, zLex{min}, zLex{max}, offset, count, false, c.sk)
+	return c.zGeneralRange(key, zLex{min}, zLex{max}, offset, count, false, c.sortKey)
 }
 
 func (c Client) ZREVRANGEBYSCORE(key string, max, min float64, offset, count int32) (membersWithScores map[string]float64, err error) {
-	return c.zGeneralRange(key, zScore{min}, zScore{max}, offset, count, false, c.skN)
+	return c.zGeneralRange(key, zScore{min}, zScore{max}, offset, count, false, c.sortKeyNum)
 }
 
 func (c Client) ZREVRANK(key string, member string) (rank int32, found bool, err error) {
@@ -482,12 +482,12 @@ func (c Client) ZSCORE(key string, member string) (score float64, found bool, er
 			pk: key,
 			sk: member,
 		}.toAV(c),
-		ProjectionExpression: aws.String(strings.Join([]string{c.skN}, ", ")),
+		ProjectionExpression: aws.String(strings.Join([]string{c.sortKeyNum}, ", ")),
 		TableName:            aws.String(c.table),
 	})
 	if err == nil && len(resp.Item) > 0 {
 		found = true
-		score = zScoreFromAV(resp.Item[c.skN])
+		score = zScoreFromAV(resp.Item[c.sortKeyNum])
 	}
 
 	return

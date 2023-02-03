@@ -1,6 +1,7 @@
 package redimo
 
 import (
+	"context"
 	"fmt"
 	"strconv"
 	"strings"
@@ -15,9 +16,9 @@ type Client struct {
 	consistentReads bool
 	table           string
 	index           string
-	pk              string
-	sk              string
-	skN             string
+	partitionKey    string
+	sortKey         string
+	sortKeyNum      string
 }
 
 func (c Client) EventuallyConsistent() Client {
@@ -33,9 +34,9 @@ func (c Client) Table(table, index string) Client {
 }
 
 func (c Client) Attributes(pk string, sk string, skN string) Client {
-	c.pk = pk
-	c.sk = sk
-	c.skN = skN
+	c.partitionKey = pk
+	c.sortKey = sk
+	c.sortKeyNum = skN
 
 	return c
 }
@@ -45,15 +46,55 @@ func (c Client) StronglyConsistent() Client {
 	return c
 }
 
+func (c Client) CreateTable(table string) {
+	_, err := c.ddbClient.CreateTable(context.TODO(), &dynamodb.CreateTableInput{
+		AttributeDefinitions: []types.AttributeDefinition{
+			{AttributeName: aws.String(c.partitionKey), AttributeType: "S"},
+			{AttributeName: aws.String(c.sortKey), AttributeType: "S"},
+			{AttributeName: aws.String(c.sortKeyNum), AttributeType: "N"},
+		},
+		BillingMode:            types.BillingModePayPerRequest,
+		GlobalSecondaryIndexes: nil,
+		KeySchema: []types.KeySchemaElement{
+			{AttributeName: aws.String(c.partitionKey), KeyType: types.KeyTypeHash},
+			{AttributeName: aws.String(c.sortKey), KeyType: types.KeyTypeRange},
+		},
+		LocalSecondaryIndexes: []types.LocalSecondaryIndex{
+			{
+				IndexName: aws.String(c.index),
+				KeySchema: []types.KeySchemaElement{
+					{AttributeName: aws.String(c.partitionKey), KeyType: types.KeyTypeHash},
+					{AttributeName: aws.String(c.sortKeyNum), KeyType: types.KeyTypeRange},
+				},
+				Projection: &types.Projection{
+					NonKeyAttributes: nil,
+					ProjectionType:   types.ProjectionTypeKeysOnly,
+				},
+			},
+		},
+		ProvisionedThroughput: &types.ProvisionedThroughput{
+			ReadCapacityUnits:  aws.Int64(0),
+			WriteCapacityUnits: aws.Int64(0),
+		},
+		SSESpecification:    nil,
+		StreamSpecification: nil,
+		TableName:           aws.String(table),
+		Tags:                nil,
+	})
+	if err != nil {
+		panic(err)
+	}
+}
+
 func NewClient(service *dynamodb.Client) Client {
 	return Client{
 		ddbClient:       service,
 		consistentReads: true,
 		table:           "redimo",
-		index:           "redimo_index",
-		pk:              "pk",
-		sk:              "sk",
-		skN:             "skN",
+		index:           "idx",
+		partitionKey:    "pk",
+		sortKey:         "sk",
+		sortKeyNum:      "skN",
 	}
 }
 
@@ -181,8 +222,8 @@ type keyDef struct {
 
 func (k keyDef) toAV(c Client) map[string]types.AttributeValue {
 	m := map[string]types.AttributeValue{
-		c.pk: &types.AttributeValueMemberS{Value: k.pk},
-		c.sk: &types.AttributeValueMemberS{Value: k.sk},
+		c.partitionKey: &types.AttributeValueMemberS{Value: k.pk},
+		c.sortKey:      &types.AttributeValueMemberS{Value: k.sk},
 	}
 
 	return m
@@ -195,8 +236,8 @@ type itemDef struct {
 
 func parseKey(avm map[string]types.AttributeValue, c Client) keyDef {
 	return keyDef{
-		pk: ReturnValue{avm[c.pk]}.String(),
-		sk: ReturnValue{avm[c.sk]}.String(),
+		pk: ReturnValue{avm[c.partitionKey]}.String(),
+		sk: ReturnValue{avm[c.sortKey]}.String(),
 	}
 }
 

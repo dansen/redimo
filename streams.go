@@ -179,7 +179,7 @@ func (pi PendingItem) updateDeliveryAction(key string, c Client) *dynamodb.Updat
 }
 
 func parsePendingItem(avm map[string]types.AttributeValue, c Client) (pi PendingItem) {
-	pi.ID = XID(ReturnValue{avm[c.sk]}.String())
+	pi.ID = XID(ReturnValue{avm[c.sortKey]}.String())
 	pi.Consumer = ReturnValue{avm[consumerKey]}.String()
 	timestamp := ReturnValue{avm[lastDeliveryTimestampKey]}.Int()
 	pi.LastDelivered = time.Unix(timestamp, 0)
@@ -200,8 +200,8 @@ func (i StreamItem) putAction(key string, c Client) types.TransactWriteItem {
 
 func (i StreamItem) toAV(key string, c Client) map[string]types.AttributeValue {
 	avm := make(map[string]types.AttributeValue)
-	avm[c.pk] = StringValue{key}.ToAV()
-	avm[c.sk] = StringValue{i.ID.String()}.ToAV()
+	avm[c.partitionKey] = StringValue{key}.ToAV()
+	avm[c.sortKey] = StringValue{i.ID.String()}.ToAV()
 
 	for k, v := range i.Fields {
 		avm["_"+k] = v.ToAV()
@@ -322,7 +322,7 @@ func (c Client) xInitAction(key string) types.TransactWriteItem {
 func (c Client) XCLAIM(key string, group string, consumer string, lastDeliveredBefore time.Time, ids ...XID) (items []StreamItem, err error) {
 	for _, id := range ids {
 		builder := newExpresionBuilder()
-		builder.addConditionExists(c.pk)
+		builder.addConditionExists(c.partitionKey)
 		builder.addConditionLessThanOrEqualTo(lastDeliveryTimestampKey, IntValue{lastDeliveredBefore.Unix()})
 		builder.updateSET(lastDeliveryTimestampKey, IntValue{time.Now().Unix()})
 		builder.updateSET(deliveryCountKey, IntValue{0})
@@ -444,8 +444,8 @@ func (c Client) XLEN(key string, start, stop XID) (count int32, err error) {
 
 	for hasMoreResults {
 		builder := newExpresionBuilder()
-		builder.addConditionEquality(c.pk, StringValue{key})
-		builder.condition(fmt.Sprintf("#%v BETWEEN :start AND :stop", c.sk), c.sk)
+		builder.addConditionEquality(c.partitionKey, StringValue{key})
+		builder.condition(fmt.Sprintf("#%v BETWEEN :start AND :stop", c.sortKey), c.sortKey)
 		builder.values["start"] = start.av()
 		builder.values["stop"] = stop.av()
 		resp, err := c.ddbClient.Query(context.TODO(), &dynamodb.QueryInput{
@@ -482,8 +482,8 @@ func (c Client) XPENDING(key string, group string, count int32) (pendingItems []
 
 	for hasMoreResults && count > 0 {
 		builder := newExpresionBuilder()
-		builder.addConditionEquality(c.pk, StringValue{c.xGroupKey(key, group)})
-		builder.condition(fmt.Sprintf("#%v BETWEEN :start AND :stop", c.sk), c.sk)
+		builder.addConditionEquality(c.partitionKey, StringValue{c.xGroupKey(key, group)})
+		builder.condition(fmt.Sprintf("#%v BETWEEN :start AND :stop", c.sortKey), c.sortKey)
 		builder.values["start"] = XStart.av()
 		builder.values["stop"] = XEnd.av()
 
@@ -555,8 +555,8 @@ func (c Client) xRange(key string, start, stop XID, count int32, forward bool) (
 
 	for hasMoreResults && count > 0 {
 		builder := newExpresionBuilder()
-		builder.addConditionEquality(c.pk, StringValue{key})
-		builder.condition(fmt.Sprintf("#%v BETWEEN :start AND :stop", c.sk), c.sk)
+		builder.addConditionEquality(c.partitionKey, StringValue{key})
+		builder.condition(fmt.Sprintf("#%v BETWEEN :start AND :stop", c.sortKey), c.sortKey)
 		builder.values["start"] = start.av()
 		builder.values["stop"] = stop.av()
 		resp, err := c.ddbClient.Query(context.TODO(), &dynamodb.QueryInput{
@@ -598,7 +598,7 @@ func parseStreamItem(item map[string]types.AttributeValue, c Client) (si StreamI
 		}
 	}
 
-	si.ID = XID(ReturnValue{item[c.sk]}.String())
+	si.ID = XID(ReturnValue{item[c.sortKey]}.String())
 
 	return
 }
@@ -646,8 +646,8 @@ func (c Client) xGroupReadPending(key string, group string, consumer string, cou
 
 	for hasMoreResults && count > 0 {
 		query := newExpresionBuilder()
-		query.addConditionEquality(c.pk, StringValue{c.xGroupKey(key, group)})
-		query.condition(fmt.Sprintf("#%v BETWEEN :start AND :stop", c.sk), c.sk)
+		query.addConditionEquality(c.partitionKey, StringValue{c.xGroupKey(key, group)})
+		query.condition(fmt.Sprintf("#%v BETWEEN :start AND :stop", c.sortKey), c.sortKey)
 		query.values["start"] = StringValue{XStart.String()}.ToAV()
 		query.values["stop"] = StringValue{XEnd.String()}.ToAV()
 		query.values[consumerKey] = StringValue{consumer}.ToAV()
@@ -765,8 +765,8 @@ func (c Client) XTRIM(key string, newCount int32) (deletedCount int32, err error
 
 	for hasMoreResults {
 		builder := newExpresionBuilder()
-		builder.addConditionEquality(c.pk, StringValue{key})
-		builder.condition(fmt.Sprintf("#%v BETWEEN :start AND :stop", c.sk), c.sk)
+		builder.addConditionEquality(c.partitionKey, StringValue{key})
+		builder.condition(fmt.Sprintf("#%v BETWEEN :start AND :stop", c.sortKey), c.sortKey)
 		builder.values["start"] = XStart.av()
 		builder.values["stop"] = XEnd.av()
 		resp, err := c.ddbClient.Query(context.TODO(), &dynamodb.QueryInput{
@@ -775,7 +775,7 @@ func (c Client) XTRIM(key string, newCount int32) (deletedCount int32, err error
 			ExpressionAttributeNames:  builder.expressionAttributeNames(),
 			ExpressionAttributeValues: builder.expressionAttributeValues(),
 			KeyConditionExpression:    builder.conditionExpression(),
-			ProjectionExpression:      aws.String(strings.Join([]string{c.pk, c.sk}, ",")),
+			ProjectionExpression:      aws.String(strings.Join([]string{c.partitionKey, c.sortKey}, ",")),
 			ScanIndexForward:          aws.Bool(false),
 			TableName:                 aws.String(c.table),
 		})

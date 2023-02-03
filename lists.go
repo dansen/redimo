@@ -53,14 +53,14 @@ func (c Client) listCountKey(key string) keyDef {
 
 func (ln listNode) toAV(c Client) map[string]types.AttributeValue {
 	avm := map[string]types.AttributeValue{}
-	avm[c.pk] = StringValue{ln.key}.ToAV()
-	avm[c.sk] = StringValue{ln.address}.ToAV()
+	avm[c.partitionKey] = StringValue{ln.key}.ToAV()
+	avm[c.sortKey] = StringValue{ln.address}.ToAV()
 	avm[skLeft] = StringValue{ln.left}.ToAV()
 	avm[skRight] = StringValue{ln.right}.ToAV()
 	avm[vk] = ln.value.av
 
 	if ln.isHead() || ln.isTail() {
-		avm[c.skN] = IntValue{1}.ToAV()
+		avm[c.sortKeyNum] = IntValue{1}.ToAV()
 	}
 
 	return avm
@@ -68,8 +68,8 @@ func (ln listNode) toAV(c Client) map[string]types.AttributeValue {
 
 func (ln listNode) keyAV(c Client) map[string]types.AttributeValue {
 	avm := map[string]types.AttributeValue{}
-	avm[c.pk] = StringValue{ln.key}.ToAV()
-	avm[c.sk] = StringValue{ln.address}.ToAV()
+	avm[c.partitionKey] = StringValue{ln.key}.ToAV()
+	avm[c.sortKey] = StringValue{ln.address}.ToAV()
 
 	return avm
 }
@@ -144,9 +144,9 @@ func (ln listNode) updateBothSidesAction(newLeft string, newRight string, c Clie
 	updater.updateSET(skRight, StringValue{newRight})
 
 	if newLeft == listNull || newRight == listNull {
-		updater.updateSET(c.skN, IntValue{1})
+		updater.updateSET(c.sortKeyNum, IntValue{1})
 	} else {
-		updater.updateSET(c.skN, IntValue{0})
+		updater.updateSET(c.sortKeyNum, IntValue{0})
 	}
 
 	return types.TransactWriteItem{
@@ -168,9 +168,9 @@ func (ln listNode) updateSideAction(side LSide, newAddress string, c Client) typ
 	updater.updateSET(ln.prevAttr(side), StringValue{newAddress})
 
 	if newAddress == listNull || ln.next(side) == listNull {
-		updater.updateSET(c.skN, IntValue{1})
+		updater.updateSET(c.sortKeyNum, IntValue{1})
 	} else {
-		updater.updateSET(c.skN, IntValue{0})
+		updater.updateSET(c.sortKeyNum, IntValue{0})
 	}
 
 	return types.TransactWriteItem{
@@ -212,8 +212,8 @@ func (ln listNode) deleteAction(c Client) types.TransactWriteItem {
 }
 
 func lParseNode(avm map[string]types.AttributeValue, c Client) (ln listNode) {
-	ln.key = ReturnValue{avm[c.pk]}.String()
-	ln.address = ReturnValue{avm[c.sk]}.String()
+	ln.key = ReturnValue{avm[c.partitionKey]}.String()
+	ln.address = ReturnValue{avm[c.sortKey]}.String()
 	ln.left = ReturnValue{avm[skLeft]}.String()
 	ln.right = ReturnValue{avm[skRight]}.String()
 	ln.value = ReturnValue{avm[vk]}
@@ -470,8 +470,8 @@ func (c Client) listCountDeltaAction(key string, delta int64) types.TransactWrit
 
 func (c Client) listFindEnd(key string, side LSide) (node listNode, found bool, err error) {
 	queryCondition := newExpresionBuilder()
-	queryCondition.addConditionEquality(c.pk, StringValue{key})
-	queryCondition.addConditionEquality(c.skN, IntValue{1})
+	queryCondition.addConditionEquality(c.partitionKey, StringValue{key})
+	queryCondition.addConditionEquality(c.sortKeyNum, IntValue{1})
 
 	resp, err := c.ddbClient.Query(context.TODO(), &dynamodb.QueryInput{
 		ConsistentRead:            aws.Bool(true),
@@ -542,7 +542,7 @@ func (c Client) LRANGE(key string, start, stop int64) (elements []ReturnValue, e
 	nodeMap := make(map[string]listNode)
 	// The most common case is a full fetch, so let's start with that for now.
 	queryCondition := newExpresionBuilder()
-	queryCondition.addConditionEquality(c.pk, StringValue{key})
+	queryCondition.addConditionEquality(c.partitionKey, StringValue{key})
 
 	hasMoreResults := true
 
@@ -660,7 +660,7 @@ func (c Client) LSET(key string, index int64, element string) (ok bool, err erro
 	}
 
 	updater := newExpresionBuilder()
-	updater.addConditionExists(c.pk)
+	updater.addConditionExists(c.partitionKey)
 	updater.updateSET(vk, StringValue{element})
 
 	_, err = c.ddbClient.UpdateItem(context.TODO(), &dynamodb.UpdateItemInput{

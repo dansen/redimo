@@ -19,7 +19,7 @@ func TestClientBuilder(t *testing.T) {
 	assert.Equal(t, c1.ddbClient, dynamoService)
 	assert.True(t, c1.consistentReads)
 	assert.Equal(t, "redimo", c1.table)
-	assert.Equal(t, c1.pk, c1.pk)
+	assert.Equal(t, c1.partitionKey, c1.partitionKey)
 	assert.False(t, c1.EventuallyConsistent().consistentReads)
 	c2 := c1.Table("table2", "index2").EventuallyConsistent()
 	assert.Equal(t, "table2", c2.table)
@@ -44,7 +44,7 @@ func newClient(t *testing.T) Client {
 			{AttributeName: aws.String(sortKey), AttributeType: "S"},
 			{AttributeName: aws.String(sortKeyNum), AttributeType: "N"},
 		},
-		BillingMode:            "",
+		BillingMode:            types.BillingModePayPerRequest,
 		GlobalSecondaryIndexes: nil,
 		KeySchema: []types.KeySchemaElement{
 			{AttributeName: aws.String(partitionKey), KeyType: types.KeyTypeHash},
@@ -64,8 +64,8 @@ func newClient(t *testing.T) Client {
 			},
 		},
 		ProvisionedThroughput: &types.ProvisionedThroughput{
-			ReadCapacityUnits:  aws.Int64(1),
-			WriteCapacityUnits: aws.Int64(1),
+			ReadCapacityUnits:  aws.Int64(0),
+			WriteCapacityUnits: aws.Int64(0),
 		},
 		SSESpecification:    nil,
 		StreamSpecification: nil,

@@ -78,7 +78,7 @@ func (c Client) GEOADD(key string, members map[string]GLocation) (newlyAddedMemb
 
 	for member, location := range members {
 		builder := newExpresionBuilder()
-		builder.updateSetAV(c.skN, location.toAV())
+		builder.updateSetAV(c.sortKeyNum, location.toAV())
 
 		resp, err := c.ddbClient.UpdateItem(context.TODO(), &dynamodb.UpdateItemInput{
 			ConditionExpression:       builder.conditionExpression(),
@@ -158,7 +158,7 @@ func (c Client) GEOPOS(key string, members ...string) (locations map[string]GLoc
 		}
 
 		if len(resp.Item) > 0 {
-			locations[member] = fromCellIDString(resp.Item[c.skN].(*types.AttributeValueMemberN).Value)
+			locations[member] = fromCellIDString(resp.Item[c.sortKeyNum].(*types.AttributeValueMemberN).Value)
 		}
 	}
 
@@ -183,8 +183,8 @@ func (c Client) GEORADIUS(key string, center GLocation, radius float64, radiusUn
 
 	for _, cellID := range radiusCap.CellUnionBound() {
 		builder := newExpresionBuilder()
-		builder.addConditionEquality(c.pk, StringValue{key})
-		builder.condition(fmt.Sprintf("#%v BETWEEN :start AND :stop", c.skN), c.skN)
+		builder.addConditionEquality(c.partitionKey, StringValue{key})
+		builder.condition(fmt.Sprintf("#%v BETWEEN :start AND :stop", c.sortKeyNum), c.sortKeyNum)
 		builder.values["start"] = &types.AttributeValueMemberN{Value: fmt.Sprintf("%d", cellID.RangeMin())}
 		builder.values["stop"] = &types.AttributeValueMemberN{Value: fmt.Sprintf("%d", cellID.RangeMax())}
 
@@ -214,8 +214,8 @@ func (c Client) GEORADIUS(key string, center GLocation, radius float64, radiusUn
 			}
 
 			for _, item := range resp.Items {
-				location := fromCellIDString(item[c.skN].(*types.AttributeValueMemberN).Value)
-				member := item[c.sk].(*types.AttributeValueMemberS).Value
+				location := fromCellIDString(item[c.sortKeyNum].(*types.AttributeValueMemberN).Value)
+				member := item[c.sortKey].(*types.AttributeValueMemberS).Value
 
 				if center.DistanceTo(location, radiusUnit) <= radius {
 					positions[member] = location

@@ -41,7 +41,7 @@ func (c Client) listSortKeys(key string) (sortKeys []string, err error) {
 
 	for hasMoreResults {
 		builder := newExpresionBuilder()
-		builder.addConditionEquality(c.pk, StringValue{key})
+		builder.addConditionEquality(c.partitionKey, StringValue{key})
 
 		resp, err := c.ddbClient.Query(context.TODO(), &dynamodb.QueryInput{
 			ConsistentRead:            aws.Bool(c.consistentReads),
@@ -50,7 +50,7 @@ func (c Client) listSortKeys(key string) (sortKeys []string, err error) {
 			ExpressionAttributeValues: builder.expressionAttributeValues(),
 			KeyConditionExpression:    builder.conditionExpression(),
 			TableName:                 aws.String(c.table),
-			ProjectionExpression:      aws.String(c.sk),
+			ProjectionExpression:      aws.String(c.sortKey),
 			Select:                    types.SelectSpecificAttributes,
 		})
 
@@ -77,7 +77,7 @@ func (c Client) EXISTS(key string) (exists bool, err error) {
 	var lastEvaluatedKey map[string]types.AttributeValue
 
 	builder := newExpresionBuilder()
-	builder.addConditionEquality(c.pk, StringValue{key})
+	builder.addConditionEquality(c.partitionKey, StringValue{key})
 
 	resp, err := c.ddbClient.Query(context.TODO(), &dynamodb.QueryInput{
 		ConsistentRead:            aws.Bool(c.consistentReads),
@@ -94,3 +94,42 @@ func (c Client) EXISTS(key string) (exists bool, err error) {
 
 	return len(resp.Items) > 0, nil
 }
+
+// func (c Client) KEYS(key string) (keys []string, err error) {
+// 	hasMoreResults := true
+
+// 	var lastEvaluatedKey map[string]types.AttributeValue
+
+// 	for hasMoreResults {
+// 		builder := newExpresionBuilder()
+// 		builder.addConditionEquality(c.pk, StringValue{key})
+
+// 		resp, err := c.ddbClient.Query(context.TODO(), &dynamodb.QueryInput{
+// 			ConsistentRead:            aws.Bool(c.consistentReads),
+// 			ExclusiveStartKey:         lastEvaluatedKey,
+// 			ExpressionAttributeNames:  builder.expressionAttributeNames(),
+// 			ExpressionAttributeValues: builder.expressionAttributeValues(),
+// 			KeyConditionExpression:    builder.conditionExpression(),
+// 			TableName:                 aws.String(c.table),
+// 			ProjectionExpression:      aws.String(c.sk),
+// 			Select:                    types.SelectSpecificAttributes,
+// 		})
+
+// 		if err != nil {
+// 			return keys, err
+// 		}
+
+// 		for _, item := range resp.Items {
+// 			parsedItem := parseItem(item, c)
+// 			keys = append(keys, parsedItem.sk)
+// 		}
+
+// 		if len(resp.LastEvaluatedKey) > 0 {
+// 			lastEvaluatedKey = resp.LastEvaluatedKey
+// 		} else {
+// 			hasMoreResults = false
+// 		}
+// 	}
+
+// 	return
+// }

@@ -16,15 +16,15 @@ type setMember struct {
 
 func (sm setMember) toAV(c Client) map[string]types.AttributeValue {
 	av := sm.keyAV(c)
-	av[c.skN] = IntValue{rand.Int63()}.ToAV()
+	av[c.sortKeyNum] = IntValue{rand.Int63()}.ToAV()
 
 	return av
 }
 
 func (sm setMember) keyAV(c Client) map[string]types.AttributeValue {
 	av := make(map[string]types.AttributeValue)
-	av[c.pk] = StringValue{sm.pk}.ToAV()
-	av[c.sk] = StringValue{sm.sk}.ToAV()
+	av[c.partitionKey] = StringValue{sm.pk}.ToAV()
+	av[c.sortKey] = StringValue{sm.sk}.ToAV()
 
 	return av
 }
@@ -170,7 +170,7 @@ func (c Client) SMEMBERS(key string) (members []string, err error) {
 
 	for hasMoreResults {
 		builder := newExpresionBuilder()
-		builder.addConditionEquality(c.pk, StringValue{key})
+		builder.addConditionEquality(c.partitionKey, StringValue{key})
 
 		resp, err := c.ddbClient.Query(context.TODO(), &dynamodb.QueryInput{
 			ConsistentRead:            aws.Bool(c.consistentReads),
@@ -202,7 +202,7 @@ func (c Client) SMEMBERS(key string) (members []string, err error) {
 
 func (c Client) SMOVE(sourceKey string, destinationKey string, member string) (ok bool, err error) {
 	builder := newExpresionBuilder()
-	builder.addConditionExists(c.pk)
+	builder.addConditionExists(c.partitionKey)
 
 	_, err = c.ddbClient.TransactWriteItems(context.TODO(), &dynamodb.TransactWriteItemsInput{
 		TransactItems: []types.TransactWriteItem{
@@ -250,7 +250,7 @@ func (c Client) SRANDMEMBER(key string, count int32) (members []string, err erro
 	}
 
 	builder := newExpresionBuilder()
-	builder.addConditionEquality(c.pk, StringValue{key})
+	builder.addConditionEquality(c.partitionKey, StringValue{key})
 
 	resp, err := c.ddbClient.Query(context.TODO(), &dynamodb.QueryInput{
 		ConsistentRead:            aws.Bool(c.consistentReads),
