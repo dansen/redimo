@@ -41,7 +41,7 @@ func (c Client) SADD(key string, members ...string) (addedMembers []string, err 
 		resp, err := c.ddbClient.PutItem(context.TODO(), &dynamodb.PutItemInput{
 			Item:         setMember{pk: key, sk: member}.toAV(c),
 			ReturnValues: types.ReturnValueAllOld,
-			TableName:    aws.String(c.table),
+			TableName:    aws.String(c.tableName),
 		})
 		if err != nil {
 			return addedMembers, err
@@ -154,7 +154,7 @@ func (c Client) SISMEMBER(key string, member string) (ok bool, err error) {
 	resp, err := c.ddbClient.GetItem(context.TODO(), &dynamodb.GetItemInput{
 		ConsistentRead: aws.Bool(c.consistentReads),
 		Key:            setMember{pk: key, sk: member}.keyAV(c),
-		TableName:      aws.String(c.table),
+		TableName:      aws.String(c.tableName),
 	})
 	if err != nil || len(resp.Item) == 0 {
 		return
@@ -178,7 +178,7 @@ func (c Client) SMEMBERS(key string) (members []string, err error) {
 			ExpressionAttributeNames:  builder.expressionAttributeNames(),
 			ExpressionAttributeValues: builder.expressionAttributeValues(),
 			KeyConditionExpression:    builder.conditionExpression(),
-			TableName:                 aws.String(c.table),
+			TableName:                 aws.String(c.tableName),
 		})
 
 		if err != nil {
@@ -212,13 +212,13 @@ func (c Client) SMOVE(sourceKey string, destinationKey string, member string) (o
 					ExpressionAttributeNames:  builder.expressionAttributeNames(),
 					ExpressionAttributeValues: builder.expressionAttributeValues(),
 					Key:                       setMember{pk: sourceKey, sk: member}.keyAV(c),
-					TableName:                 aws.String(c.table),
+					TableName:                 aws.String(c.tableName),
 				},
 			},
 			{
 				Put: &types.Put{
 					Item:      setMember{pk: destinationKey, sk: member}.toAV(c),
-					TableName: aws.String(c.table),
+					TableName: aws.String(c.tableName),
 				},
 			},
 		},
@@ -258,7 +258,7 @@ func (c Client) SRANDMEMBER(key string, count int32) (members []string, err erro
 		ExpressionAttributeValues: builder.expressionAttributeValues(),
 		KeyConditionExpression:    builder.conditionExpression(),
 		Limit:                     aws.Int32(count),
-		TableName:                 aws.String(c.table),
+		TableName:                 aws.String(c.tableName),
 	})
 
 	if err != nil {
@@ -281,7 +281,7 @@ func (c Client) SREM(key string, members ...string) (removedMembers []string, er
 				sk: member,
 			}.keyAV(c),
 			ReturnValues: types.ReturnValueAllOld,
-			TableName:    aws.String(c.table),
+			TableName:    aws.String(c.tableName),
 		})
 		if err != nil {
 			return removedMembers, err

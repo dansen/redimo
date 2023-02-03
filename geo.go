@@ -86,7 +86,7 @@ func (c Client) GEOADD(key string, members map[string]GLocation) (newlyAddedMemb
 			ExpressionAttributeValues: builder.expressionAttributeValues(),
 			Key:                       keyDef{pk: key, sk: member}.toAV(c),
 			ReturnValues:              types.ReturnValueAllOld,
-			TableName:                 aws.String(c.table),
+			TableName:                 aws.String(c.tableName),
 			UpdateExpression:          builder.updateExpression(),
 		})
 
@@ -150,7 +150,7 @@ func (c Client) GEOPOS(key string, members ...string) (locations map[string]GLoc
 		resp, err := c.ddbClient.GetItem(context.TODO(), &dynamodb.GetItemInput{
 			ConsistentRead: aws.Bool(c.consistentReads),
 			Key:            keyDef{pk: key, sk: member}.toAV(c),
-			TableName:      aws.String(c.table),
+			TableName:      aws.String(c.tableName),
 		})
 
 		if err != nil {
@@ -198,10 +198,10 @@ func (c Client) GEORADIUS(key string, center GLocation, radius float64, radiusUn
 				ExclusiveStartKey:         cursor,
 				ExpressionAttributeNames:  builder.expressionAttributeNames(),
 				ExpressionAttributeValues: builder.expressionAttributeValues(),
-				IndexName:                 aws.String(c.index),
+				IndexName:                 aws.String(c.indexName),
 				KeyConditionExpression:    builder.conditionExpression(),
 				Limit:                     aws.Int32(count),
-				TableName:                 aws.String(c.table),
+				TableName:                 aws.String(c.tableName),
 			})
 			if err != nil {
 				return positions, err

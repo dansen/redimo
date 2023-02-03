@@ -101,7 +101,7 @@ func (c Client) ZADD(key string, membersWithScores map[string]float64, flags Fla
 			ExpressionAttributeValues: builder.expressionAttributeValues(),
 			Key:                       keyDef{pk: key, sk: member}.toAV(c),
 			ReturnValues:              types.ReturnValueAllOld,
-			TableName:                 aws.String(c.table),
+			TableName:                 aws.String(c.tableName),
 			UpdateExpression:          builder.updateExpression(),
 		})
 		if conditionFailureError(err) {
@@ -161,7 +161,7 @@ func (c Client) zGeneralCount(key string, min rangeCap, max rangeCap, attribute 
 	var queryIndex *string
 
 	if attribute == c.sortKeyNum {
-		queryIndex = aws.String(c.index)
+		queryIndex = aws.String(c.indexName)
 	}
 
 	for hasMoreResults {
@@ -173,7 +173,7 @@ func (c Client) zGeneralCount(key string, min rangeCap, max rangeCap, attribute 
 			IndexName:                 queryIndex,
 			KeyConditionExpression:    builder.conditionExpression(),
 			Select:                    types.SelectCount,
-			TableName:                 aws.String(c.table),
+			TableName:                 aws.String(c.tableName),
 		})
 
 		if err != nil {
@@ -206,7 +206,7 @@ func (c Client) ZINCRBY(key string, member string, delta float64) (newScore floa
 			sk: member,
 		}.toAV(c),
 		ReturnValues:     types.ReturnValueAllNew,
-		TableName:        aws.String(c.table),
+		TableName:        aws.String(c.tableName),
 		UpdateExpression: aws.String(fmt.Sprintf("ADD #%v :delta", c.sortKeyNum)),
 	})
 	if err != nil {
@@ -340,7 +340,7 @@ func (c Client) zGeneralRange(key string,
 
 		var queryIndex *string
 		if attribute == c.sortKeyNum {
-			queryIndex = aws.String(c.index)
+			queryIndex = aws.String(c.indexName)
 		}
 
 		resp, err := c.ddbClient.Query(context.TODO(), &dynamodb.QueryInput{
@@ -352,7 +352,7 @@ func (c Client) zGeneralRange(key string,
 			KeyConditionExpression:    builder.conditionExpression(),
 			Limit:                     queryLimit,
 			ScanIndexForward:          aws.Bool(forward),
-			TableName:                 aws.String(c.table),
+			TableName:                 aws.String(c.tableName),
 		})
 
 		if err != nil {
@@ -408,7 +408,7 @@ func (c Client) ZREM(key string, members ...string) (removedMembers []string, er
 		resp, err := c.ddbClient.DeleteItem(context.TODO(), &dynamodb.DeleteItemInput{
 			Key:          keyDef{pk: key, sk: member}.toAV(c),
 			ReturnValues: types.ReturnValueAllOld,
-			TableName:    aws.String(c.table),
+			TableName:    aws.String(c.tableName),
 		})
 
 		if err != nil {
@@ -483,7 +483,7 @@ func (c Client) ZSCORE(key string, member string) (score float64, found bool, er
 			sk: member,
 		}.toAV(c),
 		ProjectionExpression: aws.String(strings.Join([]string{c.sortKeyNum}, ", ")),
-		TableName:            aws.String(c.table),
+		TableName:            aws.String(c.tableName),
 	})
 	if err == nil && len(resp.Item) > 0 {
 		found = true

@@ -17,7 +17,7 @@ func (c Client) HGET(key string, field string) (val ReturnValue, err error) {
 			sk: field,
 		}.toAV(c),
 		ProjectionExpression: aws.String(strings.Join([]string{vk}, ", ")),
-		TableName:            aws.String(c.table),
+		TableName:            aws.String(c.tableName),
 	})
 	if err == nil {
 		val = parseItem(resp.Item, c).val
@@ -44,7 +44,7 @@ func (c Client) HSET(key string, data interface{}) (newlySavedFields map[string]
 			ExpressionAttributeValues: builder.expressionAttributeValues(),
 			Key:                       keyDef{pk: key, sk: field}.toAV(c),
 			ReturnValues:              types.ReturnValueAllOld,
-			TableName:                 aws.String(c.table),
+			TableName:                 aws.String(c.tableName),
 			UpdateExpression:          builder.updateExpression(),
 		})
 
@@ -81,7 +81,7 @@ func (c Client) HMSET(key string, data interface{}) (err error) {
 					pk: key,
 					sk: field,
 				}.toAV(c),
-				TableName:        aws.String(c.table),
+				TableName:        aws.String(c.tableName),
 				UpdateExpression: builder.updateExpression(),
 			},
 		})
@@ -105,7 +105,7 @@ func (c Client) HMGET(key string, fields ...string) (values map[string]ReturnVal
 				sk: field,
 			}.toAV(c),
 			ProjectionExpression: aws.String(strings.Join([]string{c.sortKey, vk}, ", ")),
-			TableName:            aws.String(c.table),
+			TableName:            aws.String(c.tableName),
 		}}
 	}
 
@@ -131,7 +131,7 @@ func (c Client) HDEL(key string, fields ...string) (deletedFields []string, err 
 				sk: field,
 			}.toAV(c),
 			ReturnValues: types.ReturnValueAllOld,
-			TableName:    aws.String(c.table),
+			TableName:    aws.String(c.tableName),
 		})
 		if err != nil {
 			return deletedFields, err
@@ -153,7 +153,7 @@ func (c Client) HEXISTS(key string, field string) (exists bool, err error) {
 			sk: field,
 		}.toAV(c),
 		ProjectionExpression: aws.String(strings.Join([]string{c.partitionKey}, ", ")),
-		TableName:            aws.String(c.table),
+		TableName:            aws.String(c.tableName),
 	})
 	if err == nil && len(resp.Item) > 0 {
 		exists = true
@@ -178,7 +178,7 @@ func (c Client) HGETALL(key string) (fieldValues map[string]ReturnValue, err err
 			ExpressionAttributeNames:  builder.expressionAttributeNames(),
 			ExpressionAttributeValues: builder.expressionAttributeValues(),
 			KeyConditionExpression:    builder.conditionExpression(),
-			TableName:                 aws.String(c.table),
+			TableName:                 aws.String(c.tableName),
 		})
 
 		if err != nil {
@@ -219,7 +219,7 @@ func (c Client) hIncr(key string, field string, delta Value) (after ReturnValue,
 		},
 		Key:              keyDef{pk: key, sk: field}.toAV(c),
 		ReturnValues:     types.ReturnValueAllNew,
-		TableName:        aws.String(c.table),
+		TableName:        aws.String(c.tableName),
 		UpdateExpression: aws.String("ADD #val :delta"),
 	})
 
@@ -255,7 +255,7 @@ func (c Client) HKEYS(key string) (keys []string, err error) {
 			ExpressionAttributeNames:  builder.expressionAttributeNames(),
 			ExpressionAttributeValues: builder.expressionAttributeValues(),
 			KeyConditionExpression:    builder.conditionExpression(),
-			TableName:                 aws.String(c.table),
+			TableName:                 aws.String(c.tableName),
 			ProjectionExpression:      aws.String(c.sortKey),
 			Select:                    types.SelectSpecificAttributes,
 		})
@@ -305,7 +305,7 @@ func (c Client) HLEN(key string) (count int32, err error) {
 			ExpressionAttributeNames:  builder.expressionAttributeNames(),
 			ExpressionAttributeValues: builder.expressionAttributeValues(),
 			KeyConditionExpression:    builder.conditionExpression(),
-			TableName:                 aws.String(c.table),
+			TableName:                 aws.String(c.tableName),
 			Select:                    types.SelectCount,
 		})
 
@@ -338,7 +338,7 @@ func (c Client) HSETNX(key string, field string, value Value) (ok bool, err erro
 			pk: key,
 			sk: field,
 		}.toAV(c),
-		TableName:        aws.String(c.table),
+		TableName:        aws.String(c.tableName),
 		UpdateExpression: builder.updateExpression(),
 	})
 

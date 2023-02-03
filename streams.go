@@ -72,7 +72,7 @@ func (xid XID) sequenceUpdateAction(key string, c Client) types.TransactWriteIte
 			ExpressionAttributeNames:  builder.expressionAttributeNames(),
 			ExpressionAttributeValues: builder.expressionAttributeValues(),
 			Key:                       xSequenceKey(key).toAV(c),
-			TableName:                 aws.String(c.table),
+			TableName:                 aws.String(c.tableName),
 			UpdateExpression:          builder.updateExpression(),
 		},
 	}
@@ -154,7 +154,7 @@ func (pi PendingItem) toPutAction(key string, c Client) types.TransactWriteItem 
 			ExpressionAttributeNames:  builder.expressionAttributeNames(),
 			ExpressionAttributeValues: builder.expressionAttributeValues(),
 			Key:                       keyDef{pk: key, sk: pi.ID.String()}.toAV(c),
-			TableName:                 aws.String(c.table),
+			TableName:                 aws.String(c.tableName),
 			UpdateExpression:          builder.updateExpression(),
 		},
 	}
@@ -173,7 +173,7 @@ func (pi PendingItem) updateDeliveryAction(key string, c Client) *dynamodb.Updat
 		ExpressionAttributeNames:  builder.expressionAttributeNames(),
 		ExpressionAttributeValues: builder.expressionAttributeValues(),
 		Key:                       keyDef{pk: key, sk: pi.ID.String()}.toAV(c),
-		TableName:                 aws.String(c.table),
+		TableName:                 aws.String(c.tableName),
 		UpdateExpression:          builder.updateExpression(),
 	}
 }
@@ -193,7 +193,7 @@ func (i StreamItem) putAction(key string, c Client) types.TransactWriteItem {
 	return types.TransactWriteItem{
 		Put: &types.Put{
 			Item:      i.toAV(key, c),
-			TableName: aws.String(c.table),
+			TableName: aws.String(c.tableName),
 		},
 	}
 }
@@ -215,7 +215,7 @@ func (c Client) XACK(key string, group string, ids ...XID) (acknowledgedIds []XI
 		resp, err := c.ddbClient.DeleteItem(context.TODO(), &dynamodb.DeleteItemInput{
 			Key:          keyDef{pk: c.xGroupKey(key, group), sk: id.String()}.toAV(c),
 			ReturnValues: types.ReturnValueAllOld,
-			TableName:    aws.String(c.table),
+			TableName:    aws.String(c.tableName),
 		})
 		if err != nil {
 			return acknowledgedIds, err
@@ -313,7 +313,7 @@ func (c Client) xInitAction(key string) types.TransactWriteItem {
 			ExpressionAttributeNames:  builder.expressionAttributeNames(),
 			ExpressionAttributeValues: builder.expressionAttributeValues(),
 			Key:                       xSequenceKey(key).toAV(c),
-			TableName:                 aws.String(c.table),
+			TableName:                 aws.String(c.tableName),
 			UpdateExpression:          builder.updateExpression(),
 		},
 	}
@@ -333,7 +333,7 @@ func (c Client) XCLAIM(key string, group string, consumer string, lastDeliveredB
 			ExpressionAttributeNames:  builder.expressionAttributeNames(),
 			ExpressionAttributeValues: builder.expressionAttributeValues(),
 			Key:                       keyDef{pk: c.xGroupKey(key, group), sk: id.String()}.toAV(c),
-			TableName:                 aws.String(c.table),
+			TableName:                 aws.String(c.tableName),
 			UpdateExpression:          builder.updateExpression(),
 		})
 
@@ -369,7 +369,7 @@ func (c Client) XDEL(key string, ids ...XID) (deletedItems []XID, err error) {
 		resp, err := c.ddbClient.DeleteItem(context.TODO(), &dynamodb.DeleteItemInput{
 			Key:          keyDef{pk: key, sk: id.String()}.toAV(c),
 			ReturnValues: types.ReturnValueAllOld,
-			TableName:    aws.String(c.table),
+			TableName:    aws.String(c.tableName),
 		})
 		if err != nil {
 			return deletedItems, err
@@ -409,7 +409,7 @@ func (c Client) xGroupCursorGet(key string, group string) (id XID, err error) {
 	resp, err := c.ddbClient.GetItem(context.TODO(), &dynamodb.GetItemInput{
 		ConsistentRead: aws.Bool(true),
 		Key:            c.xGroupCursorKey(key, group).toAV(c),
-		TableName:      aws.String(c.table),
+		TableName:      aws.String(c.tableName),
 	})
 	if err != nil {
 		return
@@ -456,7 +456,7 @@ func (c Client) XLEN(key string, start, stop XID) (count int32, err error) {
 			KeyConditionExpression:    builder.conditionExpression(),
 			ScanIndexForward:          aws.Bool(true),
 			Select:                    types.SelectCount,
-			TableName:                 aws.String(c.table),
+			TableName:                 aws.String(c.tableName),
 		})
 
 		if err != nil {
@@ -495,7 +495,7 @@ func (c Client) XPENDING(key string, group string, count int32) (pendingItems []
 			KeyConditionExpression:    builder.conditionExpression(),
 			Limit:                     aws.Int32(count),
 			ScanIndexForward:          aws.Bool(true),
-			TableName:                 aws.String(c.table),
+			TableName:                 aws.String(c.tableName),
 		})
 
 		if err != nil {
@@ -567,7 +567,7 @@ func (c Client) xRange(key string, start, stop XID, count int32, forward bool) (
 			KeyConditionExpression:    builder.conditionExpression(),
 			Limit:                     aws.Int32(count),
 			ScanIndexForward:          aws.Bool(forward),
-			TableName:                 aws.String(c.table),
+			TableName:                 aws.String(c.tableName),
 		})
 
 		if err != nil {
@@ -614,7 +614,7 @@ func (c Client) xGroupCursorPushAction(key string, group string, id XID) types.T
 			ExpressionAttributeNames:  builder.expressionAttributeNames(),
 			ExpressionAttributeValues: builder.expressionAttributeValues(),
 			Key:                       c.xGroupCursorKey(key, group).toAV(c),
-			TableName:                 aws.String(c.table),
+			TableName:                 aws.String(c.tableName),
 			UpdateExpression:          builder.updateExpression(),
 		},
 	}
@@ -661,7 +661,7 @@ func (c Client) xGroupReadPending(key string, group string, consumer string, cou
 			KeyConditionExpression:    query.conditionExpression(),
 			Limit:                     aws.Int32(count),
 			ScanIndexForward:          aws.Bool(true),
-			TableName:                 aws.String(c.table),
+			TableName:                 aws.String(c.tableName),
 		})
 
 		if err != nil {
@@ -777,7 +777,7 @@ func (c Client) XTRIM(key string, newCount int32) (deletedCount int32, err error
 			KeyConditionExpression:    builder.conditionExpression(),
 			ProjectionExpression:      aws.String(strings.Join([]string{c.partitionKey, c.sortKey}, ",")),
 			ScanIndexForward:          aws.Bool(false),
-			TableName:                 aws.String(c.table),
+			TableName:                 aws.String(c.tableName),
 		})
 
 		if err != nil {

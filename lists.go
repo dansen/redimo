@@ -155,7 +155,7 @@ func (ln listNode) updateBothSidesAction(newLeft string, newRight string, c Clie
 			ExpressionAttributeNames:  updater.expressionAttributeNames(),
 			ExpressionAttributeValues: updater.expressionAttributeValues(),
 			Key:                       ln.keyAV(c),
-			TableName:                 aws.String(c.table),
+			TableName:                 aws.String(c.tableName),
 			UpdateExpression:          updater.updateExpression(),
 		},
 	}
@@ -179,7 +179,7 @@ func (ln listNode) updateSideAction(side LSide, newAddress string, c Client) typ
 			ExpressionAttributeNames:  updater.expressionAttributeNames(),
 			ExpressionAttributeValues: updater.expressionAttributeValues(),
 			Key:                       ln.keyAV(c),
-			TableName:                 aws.String(c.table),
+			TableName:                 aws.String(c.tableName),
 			UpdateExpression:          updater.updateExpression(),
 		},
 	}
@@ -197,7 +197,7 @@ func (ln listNode) putAction(c Client) types.TransactWriteItem {
 	return types.TransactWriteItem{
 		Put: &types.Put{
 			Item:      ln.toAV(c),
-			TableName: aws.String(c.table),
+			TableName: aws.String(c.tableName),
 		},
 	}
 }
@@ -206,7 +206,7 @@ func (ln listNode) deleteAction(c Client) types.TransactWriteItem {
 	return types.TransactWriteItem{
 		Delete: &types.Delete{
 			Key:       ln.keyAV(c),
-			TableName: aws.String(c.table),
+			TableName: aws.String(c.tableName),
 		},
 	}
 }
@@ -333,7 +333,7 @@ func (c Client) LLEN(key string) (length int64, err error) {
 	resp, err := c.ddbClient.GetItem(context.TODO(), &dynamodb.GetItemInput{
 		ConsistentRead: aws.Bool(true),
 		Key:            c.listCountKey(key).toAV(c),
-		TableName:      aws.String(c.table),
+		TableName:      aws.String(c.tableName),
 	})
 	if err == nil {
 		length = parseItem(resp.Item, c).val.Int()
@@ -462,7 +462,7 @@ func (c Client) listCountDeltaAction(key string, delta int64) types.TransactWrit
 				":delta": IntValue{delta}.ToAV(),
 			},
 			Key:              c.listCountKey(key).toAV(c),
-			TableName:        aws.String(c.table),
+			TableName:        aws.String(c.tableName),
 			UpdateExpression: aws.String(fmt.Sprintf("ADD %v :delta", vk)),
 		},
 	}
@@ -477,10 +477,10 @@ func (c Client) listFindEnd(key string, side LSide) (node listNode, found bool, 
 		ConsistentRead:            aws.Bool(true),
 		ExpressionAttributeNames:  queryCondition.expressionAttributeNames(),
 		ExpressionAttributeValues: queryCondition.expressionAttributeValues(),
-		IndexName:                 aws.String(c.index),
+		IndexName:                 aws.String(c.indexName),
 		KeyConditionExpression:    queryCondition.conditionExpression(),
 		Limit:                     aws.Int32(capCount),
-		TableName:                 aws.String(c.table),
+		TableName:                 aws.String(c.tableName),
 	})
 
 	if err != nil || len(resp.Items) == 0 {
@@ -510,7 +510,7 @@ func (c Client) listGetByAddress(key string, address string) (node listNode, fou
 			key:     key,
 			address: address,
 		}.keyAV(c),
-		TableName: aws.String(c.table),
+		TableName: aws.String(c.tableName),
 	})
 
 	if err != nil {
@@ -557,7 +557,7 @@ func (c Client) LRANGE(key string, start, stop int64) (elements []ReturnValue, e
 			ExpressionAttributeNames:  queryCondition.expressionAttributeNames(),
 			ExpressionAttributeValues: queryCondition.expressionAttributeValues(),
 			KeyConditionExpression:    queryCondition.conditionExpression(),
-			TableName:                 aws.String(c.table),
+			TableName:                 aws.String(c.tableName),
 		})
 		if err != nil {
 			return elements, err
@@ -668,7 +668,7 @@ func (c Client) LSET(key string, index int64, element string) (ok bool, err erro
 		ExpressionAttributeNames:  updater.expressionAttributeNames(),
 		ExpressionAttributeValues: updater.expressionAttributeValues(),
 		Key:                       node.keyAV(c),
-		TableName:                 aws.String(c.table),
+		TableName:                 aws.String(c.tableName),
 		UpdateExpression:          updater.updateExpression(),
 	})
 

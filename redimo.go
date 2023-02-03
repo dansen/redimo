@@ -14,8 +14,8 @@ import (
 type Client struct {
 	ddbClient       *dynamodb.Client
 	consistentReads bool
-	table           string
-	index           string
+	tableName       string
+	indexName       string
 	partitionKey    string
 	sortKey         string
 	sortKeyNum      string
@@ -26,10 +26,13 @@ func (c Client) EventuallyConsistent() Client {
 	return c
 }
 
-func (c Client) Table(table, index string) Client {
-	c.table = table
-	c.index = index
+func (c Client) Table(tableName string) Client {
+	c.tableName = tableName
+	return c
+}
 
+func (c Client) Index(indexName string) Client {
+	c.indexName = indexName
 	return c
 }
 
@@ -46,7 +49,7 @@ func (c Client) StronglyConsistent() Client {
 	return c
 }
 
-func (c Client) CreateTable(table string) {
+func (c Client) CreateTable(tableName string) {
 	_, err := c.ddbClient.CreateTable(context.TODO(), &dynamodb.CreateTableInput{
 		AttributeDefinitions: []types.AttributeDefinition{
 			{AttributeName: aws.String(c.partitionKey), AttributeType: "S"},
@@ -61,7 +64,7 @@ func (c Client) CreateTable(table string) {
 		},
 		LocalSecondaryIndexes: []types.LocalSecondaryIndex{
 			{
-				IndexName: aws.String(c.index),
+				IndexName: aws.String(c.indexName),
 				KeySchema: []types.KeySchemaElement{
 					{AttributeName: aws.String(c.partitionKey), KeyType: types.KeyTypeHash},
 					{AttributeName: aws.String(c.sortKeyNum), KeyType: types.KeyTypeRange},
@@ -78,7 +81,7 @@ func (c Client) CreateTable(table string) {
 		},
 		SSESpecification:    nil,
 		StreamSpecification: nil,
-		TableName:           aws.String(table),
+		TableName:           aws.String(tableName),
 		Tags:                nil,
 	})
 	if err != nil {
@@ -90,8 +93,8 @@ func NewClient(service *dynamodb.Client) Client {
 	return Client{
 		ddbClient:       service,
 		consistentReads: true,
-		table:           "redimo",
-		index:           "idx",
+		tableName:       "redimo",
+		indexName:       "idx",
 		partitionKey:    "pk",
 		sortKey:         "sk",
 		sortKeyNum:      "skN",

@@ -18,7 +18,7 @@ func (c Client) GET(key string) (val ReturnValue, err error) {
 	resp, err := c.ddbClient.GetItem(context.TODO(), &dynamodb.GetItemInput{
 		ConsistentRead: aws.Bool(c.consistentReads),
 		Key:            keyDef{pk: key, sk: emptySK}.toAV(c),
-		TableName:      aws.String(c.table),
+		TableName:      aws.String(c.tableName),
 	})
 	if err != nil || len(resp.Item) == 0 {
 		return
@@ -64,7 +64,7 @@ func (c Client) SET(key string, data interface{}, flags ...Flag) (ok bool, err e
 			pk: key,
 			sk: emptySK,
 		}.toAV(c),
-		TableName: aws.String(c.table),
+		TableName: aws.String(c.tableName),
 	})
 	if conditionFailureError(err) {
 		return false, nil
@@ -101,7 +101,7 @@ func (c Client) GETSET(key string, value Value) (oldValue ReturnValue, err error
 			sk: emptySK,
 		}.toAV(c),
 		ReturnValues: types.ReturnValueAllOld,
-		TableName:    aws.String(c.table),
+		TableName:    aws.String(c.tableName),
 	})
 
 	if err != nil || len(resp.Attributes) == 0 {
@@ -129,7 +129,7 @@ func (c Client) MGET(keys ...string) (values map[string]ReturnValue, err error) 
 					sk: emptySK,
 				}.toAV(c),
 				ProjectionExpression: aws.String(strings.Join([]string{vk, c.partitionKey}, ", ")),
-				TableName:            aws.String(c.table),
+				TableName:            aws.String(c.tableName),
 			},
 		}
 	}
@@ -198,7 +198,7 @@ func (c Client) mset(data map[string]Value, flags Flags) (ok bool, err error) {
 					pk: k,
 					sk: emptySK,
 				}.toAV(c),
-				TableName:        aws.String(c.table),
+				TableName:        aws.String(c.tableName),
 				UpdateExpression: builder.updateExpression(),
 			},
 		})
@@ -252,7 +252,7 @@ func (c Client) incr(key string, value Value) (newValue ReturnValue, err error) 
 		},
 		Key:              keyDef{pk: key, sk: emptySK}.toAV(c),
 		ReturnValues:     types.ReturnValueAllNew,
-		TableName:        aws.String(c.table),
+		TableName:        aws.String(c.tableName),
 		UpdateExpression: aws.String("ADD #val :delta"),
 	})
 

@@ -21,7 +21,7 @@ func (c Client) DEL(key string) (deletedFields []string, err error) {
 				sk: field,
 			}.toAV(c),
 			ReturnValues: types.ReturnValueAllOld,
-			TableName:    aws.String(c.table),
+			TableName:    aws.String(c.tableName),
 		})
 		if err != nil {
 			return deletedFields, err
@@ -49,7 +49,7 @@ func (c Client) listSortKeys(key string) (sortKeys []string, err error) {
 			ExpressionAttributeNames:  builder.expressionAttributeNames(),
 			ExpressionAttributeValues: builder.expressionAttributeValues(),
 			KeyConditionExpression:    builder.conditionExpression(),
-			TableName:                 aws.String(c.table),
+			TableName:                 aws.String(c.tableName),
 			ProjectionExpression:      aws.String(c.sortKey),
 			Select:                    types.SelectSpecificAttributes,
 		})
@@ -85,7 +85,7 @@ func (c Client) EXISTS(key string) (exists bool, err error) {
 		ExpressionAttributeNames:  builder.expressionAttributeNames(),
 		ExpressionAttributeValues: builder.expressionAttributeValues(),
 		KeyConditionExpression:    builder.conditionExpression(),
-		TableName:                 aws.String(c.table),
+		TableName:                 aws.String(c.tableName),
 	})
 
 	if err != nil {
