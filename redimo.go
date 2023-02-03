@@ -103,6 +103,45 @@ func (c Client) CreateTable() error {
 	return fmt.Errorf("couldn't create table %v. Here's why: %w", c.tableName, err)
 }
 
+func (c Client) CreateProvisionedTable(readCapacity int64, writeCapacity int64) error {
+	_, err := c.ddbClient.CreateTable(context.TODO(), &dynamodb.CreateTableInput{
+		AttributeDefinitions: []types.AttributeDefinition{
+			{AttributeName: aws.String(c.partitionKey), AttributeType: "S"},
+			{AttributeName: aws.String(c.sortKey), AttributeType: "S"},
+			{AttributeName: aws.String(c.sortKeyNum), AttributeType: "N"},
+		},
+		BillingMode:            types.BillingModeProvisioned,
+		GlobalSecondaryIndexes: nil,
+		KeySchema: []types.KeySchemaElement{
+			{AttributeName: aws.String(c.partitionKey), KeyType: types.KeyTypeHash},
+			{AttributeName: aws.String(c.sortKey), KeyType: types.KeyTypeRange},
+		},
+		LocalSecondaryIndexes: []types.LocalSecondaryIndex{
+			{
+				IndexName: aws.String(c.indexName),
+				KeySchema: []types.KeySchemaElement{
+					{AttributeName: aws.String(c.partitionKey), KeyType: types.KeyTypeHash},
+					{AttributeName: aws.String(c.sortKeyNum), KeyType: types.KeyTypeRange},
+				},
+				Projection: &types.Projection{
+					NonKeyAttributes: nil,
+					ProjectionType:   types.ProjectionTypeKeysOnly,
+				},
+			},
+		},
+		ProvisionedThroughput: &types.ProvisionedThroughput{
+			ReadCapacityUnits:  aws.Int64(readCapacity),
+			WriteCapacityUnits: aws.Int64(writeCapacity),
+		},
+		SSESpecification:    nil,
+		StreamSpecification: nil,
+		TableName:           aws.String(c.tableName),
+		Tags:                nil,
+	})
+
+	return fmt.Errorf("couldn't create table %v. Here's why: %w", c.tableName, err)
+}
+
 func NewClient(service *dynamodb.Client) Client {
 	return Client{
 		ddbClient:       service,
