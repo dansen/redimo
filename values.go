@@ -90,6 +90,16 @@ func ToValueMapE(data interface{}) (map[string]Value, error) {
 			}
 			valueMap[k] = value
 		}
+	case map[string]string:
+		valueMap = make(map[string]Value, len(data))
+		for k, v := range data {
+			valueMap[k] = StringValue{v}
+		}
+	case map[string][]byte:
+		valueMap = make(map[string]Value, len(data))
+		for k, v := range data {
+			valueMap[k] = BytesValue{v}
+		}
 	case map[string]Value:
 		valueMap = data
 	default:
