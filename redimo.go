@@ -100,7 +100,10 @@ func (c Client) CreateTable() error {
 		Tags:                nil,
 	})
 
-	return fmt.Errorf("couldn't create table %v. Here's why: %w", c.tableName, err)
+	if err != nil {
+		return fmt.Errorf("couldn't create table %v. Here's why: %w", c.tableName, err)
+	}
+	return nil
 }
 
 func (c Client) CreateProvisionedTable(readCapacity int64, writeCapacity int64) error {
