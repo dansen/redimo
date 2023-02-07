@@ -83,7 +83,7 @@ func (c Client) HMSET(key string, data interface{}) (err error) {
 			fields, hasMoreFields = leftFields, false
 		}
 
-		items := make([]types.TransactWriteItem, len(fieldValues))
+		items := make([]types.TransactWriteItem, len(fields))
 		for i, field := range fields {
 			v := fieldValues[field]
 			builder := newExpresionBuilder()
