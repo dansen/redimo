@@ -96,7 +96,6 @@ func (c Client) HMSET(key string, data interface{}) (err error) {
 
 func (c Client) HMGET(key string, fields ...string) (values map[string]ReturnValue, err error) {
 	values = make(map[string]ReturnValue)
-	items := make([]types.TransactGetItem, len(fields))
 
 	var (
 		hasMoreFields = true
@@ -111,6 +110,7 @@ func (c Client) HMGET(key string, fields ...string) (values map[string]ReturnVal
 			fields, hasMoreFields = leftFields, false
 		}
 
+		items := make([]types.TransactGetItem, len(fields))
 		for i, field := range fields {
 			items[i] = types.TransactGetItem{Get: &types.Get{
 				Key: keyDef{
