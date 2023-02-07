@@ -13,13 +13,14 @@ import (
 )
 
 type Client struct {
-	ddbClient       *dynamodb.Client
-	consistentReads bool
-	tableName       string
-	indexName       string
-	partitionKey    string
-	sortKey         string
-	sortKeyNum      string
+	ddbClient          *dynamodb.Client
+	consistentReads    bool
+	tableName          string
+	indexName          string
+	partitionKey       string
+	sortKey            string
+	sortKeyNum         string
+	transactionActions int
 }
 
 func (c Client) EventuallyConsistent() Client {
@@ -47,6 +48,11 @@ func (c Client) Attributes(pk string, sk string, skN string) Client {
 
 func (c Client) StronglyConsistent() Client {
 	c.consistentReads = true
+	return c
+}
+
+func (c Client) TransactionActions(actions int) Client {
+	c.transactionActions = actions
 	return c
 }
 
@@ -147,13 +153,14 @@ func (c Client) CreateProvisionedTable(readCapacity int64, writeCapacity int64) 
 
 func NewClient(service *dynamodb.Client) Client {
 	return Client{
-		ddbClient:       service,
-		consistentReads: true,
-		tableName:       "redimo",
-		indexName:       "idx",
-		partitionKey:    "pk",
-		sortKey:         "sk",
-		sortKeyNum:      "skN",
+		ddbClient:          service,
+		consistentReads:    true,
+		tableName:          "redimo",
+		indexName:          "idx",
+		partitionKey:       "pk",
+		sortKey:            "sk",
+		sortKeyNum:         "skN",
+		transactionActions: 25,
 	}
 }
 

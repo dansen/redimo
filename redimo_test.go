@@ -78,13 +78,13 @@ func newClient(t *testing.T) Client {
 }
 
 func newConfig(t *testing.T) aws.Config {
-	region := "ap-south-1"
+	region := "us-west-1"
 	credentialsProvider := credentials.NewStaticCredentialsProvider("ABCD", "EFGH", "IKJGL")
 	customResolver := aws.EndpointResolverWithOptionsFunc(func(service, region string, _ ...interface{}) (aws.Endpoint, error) {
 		if service == dynamodb.ServiceID {
 			return aws.Endpoint{
 				PartitionID:   "aws",
-				URL:           "http://localhost:19981",
+				URL:           "http://localhost:9981",
 				SigningRegion: region,
 			}, nil
 		}

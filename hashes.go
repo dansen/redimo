@@ -98,25 +98,40 @@ func (c Client) HMGET(key string, fields ...string) (values map[string]ReturnVal
 	values = make(map[string]ReturnValue)
 	items := make([]types.TransactGetItem, len(fields))
 
-	for i, field := range fields {
-		items[i] = types.TransactGetItem{Get: &types.Get{
-			Key: keyDef{
-				pk: key,
-				sk: field,
-			}.toAV(c),
-			ProjectionExpression: aws.String(strings.Join([]string{c.sortKey, vk}, ", ")),
-			TableName:            aws.String(c.tableName),
-		}}
-	}
+	var (
+		hasMoreFields = true
+		leftFields    = fields
+	)
 
-	resp, err := c.ddbClient.TransactGetItems(context.TODO(), &dynamodb.TransactGetItemsInput{
-		TransactItems: items,
-	})
+	for hasMoreFields {
+		if len(leftFields) > c.transactionActions {
+			fields, hasMoreFields = leftFields[:c.transactionActions], true
+			leftFields = leftFields[c.transactionActions:]
+		} else {
+			fields, hasMoreFields = leftFields, false
+		}
 
-	if err == nil {
-		for _, r := range resp.Responses {
-			pi := parseItem(r.Item, c)
-			values[pi.sk] = pi.val
+		for i, field := range fields {
+			items[i] = types.TransactGetItem{Get: &types.Get{
+				Key: keyDef{
+					pk: key,
+					sk: field,
+				}.toAV(c),
+				ProjectionExpression: aws.String(strings.Join([]string{c.sortKey, vk}, ", ")),
+				TableName:            aws.String(c.tableName),
+			}}
+		}
+
+		resp, err := c.ddbClient.TransactGetItems(context.TODO(), &dynamodb.TransactGetItemsInput{
+			TransactItems: items,
+		})
+		if err != nil {
+			return values, err
+		}
+
+		for i, field := range fields {
+			pi := parseItem(resp.Responses[i].Item, c)
+			values[field] = pi.val
 		}
 	}
 

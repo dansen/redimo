@@ -93,12 +93,13 @@ func TestAtomicHashOps(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, "v2", val.String())
 
-	values, err := c.HMGET("k1", "f1", "f2", "nonexistent")
+	values, err := c.HMGET("k1", "f1", "f2", "nonexistent1", "noexistent2")
 	assert.NoError(t, err)
-	assert.Len(t, values, 3)
+	assert.Len(t, values, 4)
 	assert.Equal(t, "v1", values["f1"].String())
 	assert.Equal(t, "v2", values["f2"].String())
-	assert.False(t, values["nonexistent"].Present())
+	assert.False(t, values["nonexistent1"].Present())
+	assert.False(t, values["nonexistent2"].Present())
 
 	ok, err := c.HSETNX("k1", "f1", StringValue{"v1"})
 	assert.NoError(t, err)
