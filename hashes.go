@@ -66,31 +66,51 @@ func (c Client) HMSET(key string, data interface{}) (err error) {
 		return err
 	}
 
-	items := make([]types.TransactWriteItem, 0, len(fieldValues))
-
-	for field, v := range fieldValues {
-		builder := newExpresionBuilder()
-		builder.updateSET(vk, v)
-
-		items = append(items, types.TransactWriteItem{
-			Update: &types.Update{
-				ConditionExpression:       builder.conditionExpression(),
-				ExpressionAttributeNames:  builder.expressionAttributeNames(),
-				ExpressionAttributeValues: builder.expressionAttributeValues(),
-				Key: keyDef{
-					pk: key,
-					sk: field,
-				}.toAV(c),
-				TableName:        aws.String(c.tableName),
-				UpdateExpression: builder.updateExpression(),
-			},
-		})
+	var fields []string
+	for field := range fieldValues {
+		fields = append(fields, field)
 	}
 
-	_, err = c.ddbClient.TransactWriteItems(context.TODO(), &dynamodb.TransactWriteItemsInput{
-		TransactItems: items,
-	})
+	var (
+		hasMoreFields = true
+		leftFields    = fields
+	)
+	for hasMoreFields {
+		if len(leftFields) > c.transactionActions {
+			fields, hasMoreFields = leftFields[:c.transactionActions], true
+			leftFields = leftFields[c.transactionActions:]
+		} else {
+			fields, hasMoreFields = leftFields, false
+		}
 
+		items := make([]types.TransactWriteItem, len(fieldValues))
+		for i, field := range fields {
+			v := fieldValues[field]
+			builder := newExpresionBuilder()
+			builder.updateSET(vk, v)
+
+			items[i] = types.TransactWriteItem{
+				Update: &types.Update{
+					ConditionExpression:       builder.conditionExpression(),
+					ExpressionAttributeNames:  builder.expressionAttributeNames(),
+					ExpressionAttributeValues: builder.expressionAttributeValues(),
+					Key: keyDef{
+						pk: key,
+						sk: field,
+					}.toAV(c),
+					TableName:        aws.String(c.tableName),
+					UpdateExpression: builder.updateExpression(),
+				},
+			}
+		}
+
+		_, err = c.ddbClient.TransactWriteItems(context.TODO(), &dynamodb.TransactWriteItemsInput{
+			TransactItems: items,
+		})
+		if err != nil {
+			return err
+		}
+	}
 	return
 }
 
