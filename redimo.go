@@ -160,7 +160,7 @@ func NewClient(service *dynamodb.Client) Client {
 		partitionKey:       "pk",
 		sortKey:            "sk",
 		sortKeyNum:         "skN",
-		transactionActions: 25,
+		transactionActions: 100,
 	}
 }
 
