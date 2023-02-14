@@ -243,6 +243,24 @@ func (rv ReturnValue) Empty() bool {
 	return ok
 }
 
+// Interface returns the value as an interface{}. This is useful if you are not sure what type
+func (rv ReturnValue) Interface() interface{} {
+	switch {
+	case rv.Empty():
+		return nil
+	case rv.String() != "":
+		return rv.String()
+	case rv.Bytes() != nil:
+		return rv.Bytes()
+	case rv.Int() != 0:
+		return rv.Int()
+	case rv.Float() != 0:
+		return rv.Float()
+	default:
+		return nil
+	}
+}
+
 // Present returns true if a value is present. It indicates that the underlying
 // DynamoDB AttributeValue has a data in any one of its fields. If you already know
 // the type of your value, you can call the convenience method (like String() or Int())
