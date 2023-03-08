@@ -96,10 +96,6 @@ func (c Client) CreateTable() error {
 				},
 			},
 		},
-		ProvisionedThroughput: &types.ProvisionedThroughput{
-			ReadCapacityUnits:  aws.Int64(0),
-			WriteCapacityUnits: aws.Int64(0),
-		},
 		SSESpecification:    nil,
 		StreamSpecification: nil,
 		TableName:           aws.String(c.tableName),
