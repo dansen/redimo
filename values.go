@@ -78,6 +78,26 @@ func ToValue(data interface{}) Value {
 	return value
 }
 
+func ToValuesE(data []interface{}) ([]Value, error) {
+	values := make([]Value, len(data))
+	for i, v := range data {
+		value, err := ToValueE(v)
+		if err != nil {
+			return nil, err
+		}
+		values[i] = value
+	}
+	return values, nil
+}
+
+func ToValues(data []interface{}) []Value {
+	values, err := ToValuesE(data)
+	if err != nil {
+		panic(err)
+	}
+	return values
+}
+
 func ToValueMapE(data interface{}) (map[string]Value, error) {
 	var valueMap map[string]Value
 	switch data := data.(type) {

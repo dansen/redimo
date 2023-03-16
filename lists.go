@@ -257,7 +257,17 @@ func (c Client) listNodeAtIndex(key string, index int64) (node listNode, found b
 }
 
 // LINSERT inserts the given element on the given side of the pivot element.
-func (c Client) LINSERT(key string, side LSide, pivot, element Value) (newLength int64, done bool, err error) {
+func (c Client) LINSERT(key string, side LSide, vPivot, vElement interface{}) (newLength int64, done bool, err error) {
+	pivot, err := ToValueE(vPivot)
+	if err != nil {
+		return
+	}
+
+	element, err := ToValueE(vElement)
+	if err != nil {
+		return
+	}
+
 	var actions []types.TransactWriteItem
 
 	pivotNode, found, err := c.listNodeAtPivot(key, pivot, Left)
@@ -312,7 +322,12 @@ func (c Client) LINSERT(key string, side LSide, pivot, element Value) (newLength
 	return newLength, done, err
 }
 
-func (c Client) listNodeAtPivot(key string, pivot Value, side LSide) (node listNode, found bool, err error) {
+func (c Client) listNodeAtPivot(key string, vPivot Value, side LSide) (node listNode, found bool, err error) {
+	pivot, err := ToValueE(vPivot)
+	if err != nil {
+		return
+	}
+
 	node, found, err = c.listFindEnd(key, side)
 	for found {
 		if err != nil {
@@ -390,7 +405,12 @@ func (c Client) listPopActions(key string, side LSide) (element ReturnValue, act
 	return
 }
 
-func (c Client) LPUSH(key string, elements ...Value) (newLength int64, err error) {
+func (c Client) LPUSH(key string, vElements ...interface{}) (newLength int64, err error) {
+	elements, err := ToValuesE(vElements)
+	if err != nil {
+		return
+	}
+
 	for _, element := range elements {
 		err = c.listPush(key, element, Left, Flags{})
 		if err != nil {
@@ -525,7 +545,12 @@ func (c Client) listGetByAddress(key string, address string) (node listNode, fou
 	return
 }
 
-func (c Client) LPUSHX(key string, elements ...Value) (newLength int64, err error) {
+func (c Client) LPUSHX(key string, vElements ...interface{}) (newLength int64, err error) {
+	elements, err := ToValuesE(vElements)
+	if err != nil {
+		return
+	}
+
 	for _, element := range elements {
 		err = c.listPush(key, element, Left, Flags{IfAlreadyExists})
 		if err != nil {
@@ -602,7 +627,12 @@ func (c Client) LRANGE(key string, start, stop int64) (elements []ReturnValue, e
 }
 
 // LREM removes the first occurrence on the given side of the given element.
-func (c Client) LREM(key string, side LSide, element Value) (newLength int64, done bool, err error) {
+func (c Client) LREM(key string, side LSide, vElement interface{}) (newLength int64, done bool, err error) {
+	element, err := ToValueE(vElement)
+	if err != nil {
+		return
+	}
+
 	var actions []types.TransactWriteItem
 
 	outgoingNode, found, err := c.listNodeAtPivot(key, element, side)
@@ -774,7 +804,12 @@ func (c Client) listRotate(key string) (element ReturnValue, err error) {
 	return
 }
 
-func (c Client) RPUSH(key string, elements ...Value) (newLength int64, err error) {
+func (c Client) RPUSH(key string, vElements ...interface{}) (newLength int64, err error) {
+	elements, err := ToValuesE(vElements)
+	if err != nil {
+		return
+	}
+
 	for _, element := range elements {
 		err = c.listPush(key, element, Right, nil)
 		if err != nil {
@@ -787,7 +822,12 @@ func (c Client) RPUSH(key string, elements ...Value) (newLength int64, err error
 	return
 }
 
-func (c Client) RPUSHX(key string, elements ...Value) (newLength int64, err error) {
+func (c Client) RPUSHX(key string, vElements ...interface{}) (newLength int64, err error) {
+	elements, err := ToValuesE(vElements)
+	if err != nil {
+		return
+	}
+
 	for _, element := range elements {
 		err = c.listPush(key, element, Right, Flags{IfAlreadyExists})
 		if err != nil {

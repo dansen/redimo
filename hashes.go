@@ -26,15 +26,15 @@ func (c Client) HGET(key string, field string) (val ReturnValue, err error) {
 	return
 }
 
-func (c Client) HSET(key string, data interface{}) (newlySavedFields map[string]Value, err error) {
-	fieldValues, err := ToValueMapE(data)
+func (c Client) HSET(key string, vFieldMap interface{}) (newlySavedFields map[string]Value, err error) {
+	fieldMap, err := ToValueMapE(vFieldMap)
 	if err != nil {
 		return newlySavedFields, err
 	}
 
 	newlySavedFields = make(map[string]Value)
 
-	for field, value := range fieldValues {
+	for field, value := range fieldMap {
 		builder := newExpresionBuilder()
 		builder.updateSetAV(vk, value.ToAV())
 
@@ -60,14 +60,14 @@ func (c Client) HSET(key string, data interface{}) (newlySavedFields map[string]
 	return
 }
 
-func (c Client) HMSET(key string, data interface{}) (err error) {
-	fieldValues, err := ToValueMapE(data)
+func (c Client) HMSET(key string, vFieldMap interface{}) (err error) {
+	fieldMap, err := ToValueMapE(vFieldMap)
 	if err != nil {
 		return err
 	}
 
 	var fields []string
-	for field := range fieldValues {
+	for field := range fieldMap {
 		fields = append(fields, field)
 	}
 
@@ -85,7 +85,7 @@ func (c Client) HMSET(key string, data interface{}) (err error) {
 
 		items := make([]types.TransactWriteItem, len(fields))
 		for i, field := range fields {
-			v := fieldValues[field]
+			v := fieldMap[field]
 			builder := newExpresionBuilder()
 			builder.updateSET(vk, v)
 
