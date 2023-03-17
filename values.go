@@ -28,6 +28,8 @@ type Value interface {
 
 func ToValueE(data interface{}) (value Value, err error) {
 	switch data := data.(type) {
+	case ReturnValue:
+		value = data
 	case StringValue:
 		value = data
 	case BytesValue:
@@ -132,6 +134,11 @@ func ToValueMapE(data interface{}) (map[string]Value, error) {
 		}
 	case map[string]Value:
 		valueMap = data
+	case map[string]ReturnValue:
+		valueMap = make(map[string]Value, len(data))
+		for k, v := range data {
+			valueMap[k] = v
+		}
 	default:
 		return valueMap, fmt.Errorf("ToValueMapE: unsupported type: %T", data)
 	}
