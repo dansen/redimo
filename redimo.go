@@ -70,7 +70,14 @@ func (c Client) ExistsTable() (bool, error) {
 	return false, fmt.Errorf("couldn't determine existence of table %v. Here's why: %w", c.tableName, err)
 }
 
-func (c Client) CreateTable() error {
+func (c Client) CreateTable(readCapacity int64, writeCapacity int64) error {
+	if readCapacity == 0 && writeCapacity == 0 {
+		return c.CreatePayPerRequestTable()
+	}
+	return c.CreateProvisionedTable(readCapacity, writeCapacity)
+}
+
+func (c Client) CreatePayPerRequestTable() error {
 	_, err := c.ddbClient.CreateTable(context.TODO(), &dynamodb.CreateTableInput{
 		AttributeDefinitions: []types.AttributeDefinition{
 			{AttributeName: aws.String(c.partitionKey), AttributeType: "S"},
