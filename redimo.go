@@ -298,7 +298,7 @@ func (k keyDef) toAV(c Client) map[string]types.AttributeValue {
 	return m
 }
 
-const emptySK = "__empty__"
+const emptySK = "/"
 
 func compatibleWithEmtpySK(sk string) string {
 	if sk == "" {
