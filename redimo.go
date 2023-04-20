@@ -292,10 +292,28 @@ type keyDef struct {
 func (k keyDef) toAV(c Client) map[string]types.AttributeValue {
 	m := map[string]types.AttributeValue{
 		c.partitionKey: &types.AttributeValueMemberS{Value: k.pk},
-		c.sortKey:      &types.AttributeValueMemberS{Value: k.sk},
+		c.sortKey:      &types.AttributeValueMemberS{Value: compatibleWithEmtpySK(k.sk)},
 	}
 
 	return m
+}
+
+const emptySK = "__empty__"
+
+func compatibleWithEmtpySK(sk string) string {
+	if sk == "" {
+		return emptySK
+	}
+
+	return sk
+}
+
+func recoverFromEmptySK(sk string) string {
+	if sk == emptySK {
+		return ""
+	}
+
+	return sk
 }
 
 type itemDef struct {
@@ -306,7 +324,7 @@ type itemDef struct {
 func parseKey(avm map[string]types.AttributeValue, c Client) keyDef {
 	return keyDef{
 		pk: ReturnValue{avm[c.partitionKey]}.String(),
-		sk: ReturnValue{avm[c.sortKey]}.String(),
+		sk: recoverFromEmptySK(ReturnValue{avm[c.sortKey]}.String()),
 	}
 }
 

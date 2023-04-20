@@ -9,15 +9,13 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 )
 
-const emptySK = "/"
-
 // GET fetches the value at the given key. If the key does not exist, the ReturnValue will be Empty().
 //
 // Works similar to https://redis.io/commands/get
 func (c Client) GET(key string) (val ReturnValue, err error) {
 	resp, err := c.ddbClient.GetItem(context.TODO(), &dynamodb.GetItemInput{
 		ConsistentRead: aws.Bool(c.consistentReads),
-		Key:            keyDef{pk: key, sk: emptySK}.toAV(c),
+		Key:            keyDef{pk: key, sk: ""}.toAV(c),
 		TableName:      aws.String(c.tableName),
 	})
 	if err != nil || len(resp.Item) == 0 {
@@ -62,7 +60,7 @@ func (c Client) SET(key string, vValue interface{}, flags ...Flag) (ok bool, err
 		UpdateExpression:          builder.updateExpression(),
 		Key: keyDef{
 			pk: key,
-			sk: emptySK,
+			sk: "",
 		}.toAV(c),
 		TableName: aws.String(c.tableName),
 	})
@@ -98,7 +96,7 @@ func (c Client) GETSET(key string, value Value) (oldValue ReturnValue, err error
 		UpdateExpression:          builder.updateExpression(),
 		Key: keyDef{
 			pk: key,
-			sk: emptySK,
+			sk: "",
 		}.toAV(c),
 		ReturnValues: types.ReturnValueAllOld,
 		TableName:    aws.String(c.tableName),
@@ -126,7 +124,7 @@ func (c Client) MGET(keys ...string) (values map[string]ReturnValue, err error) 
 			Get: &types.Get{
 				Key: keyDef{
 					pk: key,
-					sk: emptySK,
+					sk: "",
 				}.toAV(c),
 				ProjectionExpression: aws.String(strings.Join([]string{vk, c.partitionKey}, ", ")),
 				TableName:            aws.String(c.tableName),
@@ -196,7 +194,7 @@ func (c Client) mset(data map[string]Value, flags Flags) (ok bool, err error) {
 				ExpressionAttributeValues: builder.expressionAttributeValues(),
 				Key: keyDef{
 					pk: k,
-					sk: emptySK,
+					sk: "",
 				}.toAV(c),
 				TableName:        aws.String(c.tableName),
 				UpdateExpression: builder.updateExpression(),
@@ -250,7 +248,7 @@ func (c Client) incr(key string, value Value) (newValue ReturnValue, err error) 
 		ExpressionAttributeValues: map[string]types.AttributeValue{
 			":delta": value.ToAV(),
 		},
-		Key:              keyDef{pk: key, sk: emptySK}.toAV(c),
+		Key:              keyDef{pk: key, sk: ""}.toAV(c),
 		ReturnValues:     types.ReturnValueAllNew,
 		TableName:        aws.String(c.tableName),
 		UpdateExpression: aws.String("ADD #val :delta"),
