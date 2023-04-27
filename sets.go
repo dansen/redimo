@@ -24,7 +24,7 @@ func (sm setMember) toAV(c Client) map[string]types.AttributeValue {
 func (sm setMember) keyAV(c Client) map[string]types.AttributeValue {
 	av := make(map[string]types.AttributeValue)
 	av[c.partitionKey] = StringValue{sm.pk}.ToAV()
-	av[c.sortKey] = StringValue{sm.sk}.ToAV()
+	av[c.sortKey] = StringValue{compatibleWithEmtpySK(sm.sk)}.ToAV()
 
 	return av
 }
