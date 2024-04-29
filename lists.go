@@ -24,36 +24,43 @@ func (c Client) createLeftIndex(key string) (index float64, err error) {
 	return 0, nil
 }
 
-func (c Client) LPUSH(key string, vElements ...interface{}) (newLength int64, err error) {
-	builder := newExpresionBuilder()
-
-	score, err := c.createLeftIndex(key)
+func (c Client) LPUSH(key string, vElements ...string) (newLength int64, err error) {
+	length, err := c.LLEN(key)
 
 	if err != nil {
-		return 0, err
+		return length, err
 	}
 
-	// snk 是分数
-	builder.updateSetAV(c.sortKeyNum, zScore{score}.ToAV())
+	for index, member := range vElements {
+		builder := newExpresionBuilder()
 
-	resp, err := c.ddbClient.UpdateItem(context.TODO(), &dynamodb.UpdateItemInput{
-		ConditionExpression:       builder.conditionExpression(),
-		ExpressionAttributeNames:  builder.expressionAttributeNames(),
-		ExpressionAttributeValues: builder.expressionAttributeValues(),
-		Key:                       keyDef{pk: key, sk: member}.toAV(c),
-		ReturnValues:              types.ReturnValueAllOld,
-		TableName:                 aws.String(c.tableName),
-		UpdateExpression:          builder.updateExpression(),
-	})
-	if conditionFailureError(err) {
-		continue
+		score, err := c.createLeftIndex(key)
+
+		if err != nil {
+			return length + int64(index), err
+		}
+
+		// snk 是分数
+		builder.updateSetAV(c.sortKeyNum, zScore{score}.ToAV())
+
+		_, err = c.ddbClient.UpdateItem(context.TODO(), &dynamodb.UpdateItemInput{
+			ConditionExpression:       builder.conditionExpression(),
+			ExpressionAttributeNames:  builder.expressionAttributeNames(),
+			ExpressionAttributeValues: builder.expressionAttributeValues(),
+			Key:                       keyDef{pk: key, sk: member}.toAV(c),
+			ReturnValues:              types.ReturnValueAllOld,
+			TableName:                 aws.String(c.tableName),
+			UpdateExpression:          builder.updateExpression(),
+		})
+
+		if conditionFailureError(err) {
+			continue
+		}
+
+		if err != nil {
+			return length + int64(index), err
+		}
 	}
 
-	if err != nil {
-		return addedMembers, err
-	}
-
-	if len(resp.Attributes) == 0 {
-		addedMembers = append(addedMembers, member)
-	}
+	return length + int64(len(vElements)), nil
 }
