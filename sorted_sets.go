@@ -85,6 +85,7 @@ func zScoreFromAV(av types.AttributeValue) float64 {
 func (c Client) ZADD(key string, membersWithScores map[string]float64, flags Flags) (addedMembers []string, err error) {
 	for member, score := range membersWithScores {
 		builder := newExpresionBuilder()
+		// snk 是分数
 		builder.updateSetAV(c.sortKeyNum, zScore{score}.ToAV())
 
 		if flags.has(IfNotExists) {

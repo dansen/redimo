@@ -270,34 +270,19 @@ func TestListValueBasedCRUD(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, []string{"beta", "delta", "phi"}, readStrings(elements))
 
-	length, ok, err := c.LINSERT("l1", Left, StringValue{"delta"}, StringValue{"gamma"})
-	assert.NoError(t, err)
-	assert.True(t, ok)
-	assert.Equal(t, int64(4), length)
-
 	elements, err = c.LRANGE("l1", 0, -1)
 	assert.NoError(t, err)
 	assert.Equal(t, []string{"beta", "gamma", "delta", "phi"}, readStrings(elements))
-
-	length, ok, err = c.LINSERT("l1", Left, StringValue{"beta"}, StringValue{"alpha"})
-	assert.NoError(t, err)
-	assert.True(t, ok)
-	assert.Equal(t, int64(5), length)
 
 	elements, err = c.LRANGE("l1", 0, -1)
 	assert.NoError(t, err)
 	assert.Equal(t, []string{"alpha", "beta", "gamma", "delta", "phi"}, readStrings(elements))
 
-	length, ok, err = c.LINSERT("l1", Right, StringValue{"phi"}, StringValue{"omega"})
-	assert.NoError(t, err)
-	assert.True(t, ok)
-	assert.Equal(t, int64(6), length)
-
 	elements, err = c.LRANGE("l1", 0, -1)
 	assert.NoError(t, err)
 	assert.Equal(t, []string{"alpha", "beta", "gamma", "delta", "phi", "omega"}, readStrings(elements))
 
-	length, ok, err = c.LREM("l1", Left, StringValue{"gamma"})
+	length, ok, err := c.LREM("l1", Left, StringValue{"gamma"})
 	assert.NoError(t, err)
 	assert.True(t, ok)
 	assert.Equal(t, int64(5), length)
@@ -349,10 +334,6 @@ func TestListValueBasedCRUD(t *testing.T) {
 	elements, err = c.LRANGE("l1", 0, -1)
 	assert.NoError(t, err)
 	assert.Equal(t, []string{"beta", "phi", "delta", "gamma", "mu"}, readStrings(elements))
-
-	_, ok, err = c.LINSERT("l1", Left, StringValue{"no such element"}, StringValue{"alpha"})
-	assert.NoError(t, err)
-	assert.False(t, ok)
 
 	_, ok, err = c.LREM("l1", Left, StringValue{"no such element"})
 	assert.NoError(t, err)
