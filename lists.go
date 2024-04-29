@@ -20,7 +20,8 @@ func (c Client) LINDEX(key string, index int64) (element ReturnValue, err error)
 }
 
 func (c Client) LLEN(key string) (length int64, err error) {
-	return
+	count, err := c.HLEN(key)
+	return int64(count), err
 }
 
 func (c Client) LPOP(key string) (element ReturnValue, err error) {
@@ -55,7 +56,7 @@ func (c Client) LPUSH(key string, vElements ...interface{}) (newLength int64, er
 
 		// snk 是分数
 		builder.updateSetAV(c.sortKeyNum, zScore{score}.ToAV())
-		member := e.(string)
+		member := e.(Value).ToAV().(*types.AttributeValueMemberS).Value
 
 		_, err = c.ddbClient.UpdateItem(context.TODO(), &dynamodb.UpdateItemInput{
 			ConditionExpression:       builder.conditionExpression(),
@@ -122,6 +123,7 @@ func (c Client) RPUSH(key string, vElements ...interface{}) (newLength int64, er
 }
 
 func (c Client) LRANGE(key string, start, stop int64) (elements []ReturnValue, err error) {
+
 	return
 }
 
