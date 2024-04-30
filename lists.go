@@ -83,6 +83,10 @@ func (c Client) lLen(key string) (count int32, err error) {
 }
 
 func (c Client) LPUSH(key string, vElements ...interface{}) (newLength int64, err error) {
+	return c.lPush(key, true, vElements...)
+}
+
+func (c Client) lPush(key string, left bool, vElements ...interface{}) (newLength int64, err error) {
 	length, err := c.LLEN(key)
 
 	if err != nil {
@@ -92,7 +96,13 @@ func (c Client) LPUSH(key string, vElements ...interface{}) (newLength int64, er
 	for index, e := range vElements {
 		builder := newExpresionBuilder()
 
-		score, err := c.createLeftIndex(key)
+		var score float64
+
+		if left {
+			score, err = c.createLeftIndex(key)
+		} else {
+			score, err = c.createRightIndex(key)
+		}
 
 		if err != nil {
 			return length + int64(index), err
@@ -125,45 +135,7 @@ func (c Client) LPUSH(key string, vElements ...interface{}) (newLength int64, er
 }
 
 func (c Client) RPUSH(key string, vElements ...interface{}) (newLength int64, err error) {
-	length, err := c.LLEN(key)
-
-	if err != nil {
-		return length, err
-	}
-
-	for index, e := range vElements {
-		builder := newExpresionBuilder()
-
-		score, err := c.createRightIndex(key)
-
-		if err != nil {
-			return length + int64(index), err
-		}
-
-		// snk 是分数
-		builder.updateSetAV(c.sortKeyNum, zScore{score}.ToAV())
-		member := e.(string)
-
-		_, err = c.ddbClient.UpdateItem(context.TODO(), &dynamodb.UpdateItemInput{
-			ConditionExpression:       builder.conditionExpression(),
-			ExpressionAttributeNames:  builder.expressionAttributeNames(),
-			ExpressionAttributeValues: builder.expressionAttributeValues(),
-			Key:                       keyDef{pk: key, sk: member}.toAV(c),
-			ReturnValues:              types.ReturnValueAllOld,
-			TableName:                 aws.String(c.tableName),
-			UpdateExpression:          builder.updateExpression(),
-		})
-
-		if conditionFailureError(err) {
-			continue
-		}
-
-		if err != nil {
-			return length + int64(index), err
-		}
-	}
-
-	return length + int64(len(vElements)), nil
+	return c.lPush(key, false, vElements...)
 }
 
 func (c Client) lRange(key string, start int64, stop int64, forward bool) (elements []ReturnValue, err error) {
@@ -200,6 +172,7 @@ func (c Client) lGeneralRange(key string,
 
 		builder := newExpresionBuilder()
 		builder.addConditionEquality(c.partitionKey, StringValue{key})
+		builder.addConditionEquality(c.sortKey, StringValue{ListSKMember})
 
 		if start.present() {
 			builder.values["start"] = start.ToAV()
