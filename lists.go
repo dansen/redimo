@@ -2,10 +2,17 @@ package redimo
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
+)
+
+const (
+	ListSKMember     = "member"
+	ListSKIndexLeft  = "index_left"
+	ListSKIndexRight = "index_right"
 )
 
 type LSide string
@@ -20,7 +27,7 @@ func (c Client) LINDEX(key string, index int64) (element ReturnValue, err error)
 }
 
 func (c Client) LLEN(key string) (length int64, err error) {
-	count, err := c.HLEN(key)
+	count, err := c.lLen(key)
 	return int64(count), err
 }
 
@@ -36,6 +43,43 @@ func (c Client) createLeftIndex(key string) (index float64, err error) {
 func (c Client) createRightIndex(key string) (index float64, err error) {
 	v, err := c.HINCRBY(key, "_sn_right_", 1)
 	return float64(v), err
+}
+
+func (c Client) lLen(key string) (count int32, err error) {
+	hasMoreResults := true
+
+	var lastEvaluatedKey map[string]types.AttributeValue
+
+	for hasMoreResults {
+		builder := newExpresionBuilder()
+		builder.addConditionEquality(c.partitionKey, StringValue{key})
+		builder.addConditionEquality(c.sortKey, StringValue{ListSKMember})
+
+		resp, err := c.ddbClient.Query(context.TODO(), &dynamodb.QueryInput{
+			ConsistentRead:            aws.Bool(c.consistentReads),
+			ExclusiveStartKey:         lastEvaluatedKey,
+			ExpressionAttributeNames:  builder.expressionAttributeNames(),
+			ExpressionAttributeValues: builder.expressionAttributeValues(),
+			KeyConditionExpression:    builder.conditionExpression(),
+			TableName:                 aws.String(c.tableName),
+			Select:                    types.SelectCount,
+		})
+
+		if err != nil {
+			fmt.Printf("Error in lLen: %v", err)
+			return count, err
+		}
+
+		count += resp.ScannedCount
+
+		if len(resp.LastEvaluatedKey) > 0 {
+			lastEvaluatedKey = resp.LastEvaluatedKey
+		} else {
+			hasMoreResults = false
+		}
+	}
+
+	return
 }
 
 func (c Client) LPUSH(key string, vElements ...interface{}) (newLength int64, err error) {
@@ -56,13 +100,13 @@ func (c Client) LPUSH(key string, vElements ...interface{}) (newLength int64, er
 
 		// snk 是分数
 		builder.updateSetAV(c.sortKeyNum, zScore{score}.ToAV())
-		member := e.(Value).ToAV().(*types.AttributeValueMemberS).Value
+		builder.updateSetAV(vk, e.(Value).ToAV())
 
 		_, err = c.ddbClient.UpdateItem(context.TODO(), &dynamodb.UpdateItemInput{
 			ConditionExpression:       builder.conditionExpression(),
 			ExpressionAttributeNames:  builder.expressionAttributeNames(),
 			ExpressionAttributeValues: builder.expressionAttributeValues(),
-			Key:                       keyDef{pk: key, sk: member}.toAV(c),
+			Key:                       keyDef{pk: key, sk: ListSKMember}.toAV(c),
 			ReturnValues:              types.ReturnValueAllOld,
 			TableName:                 aws.String(c.tableName),
 			UpdateExpression:          builder.updateExpression(),
@@ -122,9 +166,100 @@ func (c Client) RPUSH(key string, vElements ...interface{}) (newLength int64, er
 	return length + int64(len(vElements)), nil
 }
 
-func (c Client) LRANGE(key string, start, stop int64) (elements []ReturnValue, err error) {
+func (c Client) lRange(key string, start int64, stop int64, forward bool) (elements []ReturnValue, err error) {
+	if start < 0 && stop < 0 {
+		return c.lGeneralRange(key, negInf, posInf, -stop-1, -start, !forward, c.sortKeyNum)
+	}
 
-	return
+	if start > 0 && stop < 0 {
+		elements, err := c.lGeneralRange(key, negInf, posInf, -stop-1, 1, !forward, c.sortKeyNum)
+		if err != nil {
+			return elements, err
+		}
+	}
+
+	return c.lGeneralRange(key, negInf, posInf, start, stop-start+1, forward, c.sortKeyNum)
+}
+
+func (c Client) lGeneralRange(key string,
+	start rangeCap, stop rangeCap,
+	offset int64, count int64,
+	forward bool, attribute string) (elements []ReturnValue, err error) {
+	elements = make([]ReturnValue, 0)
+	index := int64(0)
+	remainingCount := count
+	hasMoreResults := true
+
+	var lastKey map[string]types.AttributeValue
+
+	for hasMoreResults {
+		var queryLimit *int32
+		if remainingCount > 0 {
+			queryLimit = aws.Int32(int32(remainingCount) + int32(offset) - int32(index))
+		}
+
+		builder := newExpresionBuilder()
+		builder.addConditionEquality(c.partitionKey, StringValue{key})
+
+		if start.present() {
+			builder.values["start"] = start.ToAV()
+		}
+
+		if stop.present() {
+			builder.values["stop"] = stop.ToAV()
+		}
+
+		switch {
+		case start.present() && stop.present():
+			builder.condition(fmt.Sprintf("#%v BETWEEN :start AND :stop", attribute), attribute)
+		case start.present():
+			builder.condition(fmt.Sprintf("#%v >= :start", attribute), attribute)
+		case stop.present():
+			builder.condition(fmt.Sprintf("#%v <= :stop", attribute), attribute)
+		}
+
+		var queryIndex *string
+		if attribute == c.sortKeyNum {
+			queryIndex = aws.String(c.indexName)
+		}
+
+		resp, err := c.ddbClient.Query(context.TODO(), &dynamodb.QueryInput{
+			ConsistentRead:            aws.Bool(c.consistentReads),
+			ExclusiveStartKey:         lastKey,
+			ExpressionAttributeNames:  builder.expressionAttributeNames(),
+			ExpressionAttributeValues: builder.expressionAttributeValues(),
+			IndexName:                 queryIndex,
+			KeyConditionExpression:    builder.conditionExpression(),
+			Limit:                     queryLimit,
+			ScanIndexForward:          aws.Bool(forward),
+			TableName:                 aws.String(c.tableName),
+		})
+
+		if err != nil {
+			return elements, err
+		}
+
+		for _, item := range resp.Items {
+			if index >= offset {
+				pi := parseItem(item, c)
+				elements = append(elements, pi.val)
+				remainingCount--
+			}
+			index++
+		}
+
+		if len(resp.LastEvaluatedKey) > 0 && remainingCount > 0 {
+			lastKey = resp.LastEvaluatedKey
+		} else {
+			hasMoreResults = false
+		}
+	}
+
+	return elements, nil
+}
+
+func (c Client) LRANGE(key string, start, stop int64) (elements []ReturnValue, err error) {
+	return c.lRange(key, start, stop, true)
 }
 
 func (c Client) RPOP(key string) (element ReturnValue, err error) {
