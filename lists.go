@@ -33,6 +33,30 @@ func (c Client) LLEN(key string) (length int64, err error) {
 }
 
 func (c Client) LPOP(key string) (element ReturnValue, err error) {
+	_, items, err := c.lGeneralRangeWithItems(key, negInf, posInf, 0, 1, true, c.sortKeyNum)
+
+	if err != nil || len(items) == 0 {
+		return element, err
+	}
+
+	fmt.Printf("LPOP items: %v\n", items)
+	// delete item 0
+	builder := newExpresionBuilder()
+	builder.addConditionEquality(c.partitionKey, StringValue{key})
+
+	_, err = c.ddbClient.DeleteItem(context.TODO(), &dynamodb.DeleteItemInput{
+		ConditionExpression:       builder.conditionExpression(),
+		ExpressionAttributeNames:  builder.expressionAttributeNames(),
+		ExpressionAttributeValues: builder.expressionAttributeValues(),
+		Key:                       keyDef{pk: key, sk: fmt.Sprintf("%v[%v]", ListSKMember, items[0][c.sortKeyNum].(*types.AttributeValueMemberN).Value)}.toAV(c),
+		TableName:                 aws.String(c.tableName),
+	})
+
+	if err != nil {
+		return element, err
+	}
+
+	element = parseItem(items[0], c).val
 	return
 }
 
@@ -196,8 +220,10 @@ func (c Client) lGeneralRange(key string,
 			queryIndex = aws.String(c.indexName)
 		}
 
-		fmt.Printf("lGeneralRange exp: %v names: %v values: %v", *builder.conditionExpression(),
+		fmt.Printf("lGeneralRange exp: %v names: %v values: %v\n", *builder.conditionExpression(),
 			builder.expressionAttributeNames(), builder.expressionAttributeValues())
+
+		var filter *string
 
 		resp, err := c.ddbClient.Query(context.TODO(), &dynamodb.QueryInput{
 			ConsistentRead:            aws.Bool(c.consistentReads),
@@ -206,6 +232,7 @@ func (c Client) lGeneralRange(key string,
 			ExpressionAttributeValues: builder.expressionAttributeValues(),
 			IndexName:                 queryIndex,
 			KeyConditionExpression:    builder.conditionExpression(),
+			FilterExpression:          filter,
 			Limit:                     queryLimit,
 			ScanIndexForward:          aws.Bool(forward),
 			TableName:                 aws.String(c.tableName),
@@ -236,11 +263,123 @@ func (c Client) lGeneralRange(key string,
 	return elements, nil
 }
 
+func (c Client) lGeneralRangeWithItems(key string,
+	start rangeCap, stop rangeCap,
+	offset int64, count int64,
+	forward bool, attribute string) (elements []ReturnValue, items []map[string]types.AttributeValue, err error) {
+	elements = make([]ReturnValue, 0)
+	index := int64(0)
+	remainingCount := count
+	hasMoreResults := true
+
+	var lastKey map[string]types.AttributeValue
+
+	for hasMoreResults {
+		var queryLimit *int32
+		if remainingCount > 0 {
+			queryLimit = aws.Int32(int32(remainingCount) + int32(offset) - int32(index))
+		}
+
+		builder := newExpresionBuilder()
+		builder.addConditionEquality(c.partitionKey, StringValue{key})
+
+		if start.present() {
+			builder.values["start"] = start.ToAV()
+		}
+
+		if stop.present() {
+			builder.values["stop"] = stop.ToAV()
+		}
+
+		switch {
+		case start.present() && stop.present():
+			builder.condition(fmt.Sprintf("#%v BETWEEN :start AND :stop", attribute), attribute)
+		case start.present():
+			builder.condition(fmt.Sprintf("#%v >= :start", attribute), attribute)
+		case stop.present():
+			builder.condition(fmt.Sprintf("#%v <= :stop", attribute), attribute)
+		}
+
+		var queryIndex *string
+		if attribute == c.sortKeyNum {
+			queryIndex = aws.String(c.indexName)
+		}
+
+		fmt.Printf("lGeneralRange exp: %v names: %v values: %v\n", *builder.conditionExpression(),
+			builder.expressionAttributeNames(), builder.expressionAttributeValues())
+
+		var filter *string
+
+		resp, err := c.ddbClient.Query(context.TODO(), &dynamodb.QueryInput{
+			ConsistentRead:            aws.Bool(c.consistentReads),
+			ExclusiveStartKey:         lastKey,
+			ExpressionAttributeNames:  builder.expressionAttributeNames(),
+			ExpressionAttributeValues: builder.expressionAttributeValues(),
+			IndexName:                 queryIndex,
+			KeyConditionExpression:    builder.conditionExpression(),
+			FilterExpression:          filter,
+			Limit:                     queryLimit,
+			ScanIndexForward:          aws.Bool(forward),
+			TableName:                 aws.String(c.tableName),
+			Select:                    types.SelectAllAttributes,
+		})
+
+		if err != nil {
+			fmt.Printf("Error in lGeneralRange: %v", err)
+			return elements, items, err
+		}
+
+		for _, item := range resp.Items {
+			if index >= offset {
+				pi := parseItem(item, c)
+				elements = append(elements, pi.val)
+				items = append(items, item)
+				remainingCount--
+			}
+			index++
+		}
+
+		if len(resp.LastEvaluatedKey) > 0 && remainingCount > 0 {
+			lastKey = resp.LastEvaluatedKey
+		} else {
+			hasMoreResults = false
+		}
+	}
+
+	return elements, items, nil
+}
+
 func (c Client) LRANGE(key string, start, stop int64) (elements []ReturnValue, err error) {
 	return c.lRange(key, start, stop, true)
 }
 
 func (c Client) RPOP(key string) (element ReturnValue, err error) {
+	_, items, err := c.lGeneralRangeWithItems(key, negInf, posInf, 0, 1, false, c.sortKeyNum)
+
+	if err != nil || len(items) == 0 {
+		return element, err
+	}
+
+	fmt.Printf("RPOP items: %v\n", items)
+	// delete item 0
+	builder := newExpresionBuilder()
+	builder.addConditionEquality(c.partitionKey, StringValue{key})
+
+	sk := fmt.Sprintf("%v[%v]", ListSKMember, items[0][c.sortKeyNum].(*types.AttributeValueMemberN).Value)
+
+	_, err = c.ddbClient.DeleteItem(context.TODO(), &dynamodb.DeleteItemInput{
+		ConditionExpression:       builder.conditionExpression(),
+		ExpressionAttributeNames:  builder.expressionAttributeNames(),
+		ExpressionAttributeValues: builder.expressionAttributeValues(),
+		Key:                       keyDef{pk: key, sk: sk}.toAV(c),
+		TableName:                 aws.String(c.tableName),
+	})
+
+	if err != nil {
+		return element, err
+	}
+
+	element = parseItem(items[0], c).val
 	return
 }
 
@@ -261,6 +400,41 @@ func (c Client) LSET(key string, index int64, element string) (ok bool, err erro
 }
 
 // LREM removes the first occurrence on the given side of the given element.
-func (c Client) LREM(key string, side LSide, vElement interface{}) (newLength int64, done bool, err error) {
-	return
+func (c Client) LREM(key string, side LSide, vElement interface{}) (newLength int64, success bool, err error) {
+	// count := int64(1)
+	// if side == Right {
+	// 	count = -1
+	// }
+
+	// s := vElement.(*types.AttributeValueMemberS).Value
+	// elements, _, err := c.lGeneralRangeWithMember(key, negInf, posInf, 0, count, true, c.sortKeyNum, s)
+
+	// if err != nil {
+	// 	return 0, false, err
+	// }
+
+	// for _, item := range elements {
+	// 	builder := newExpresionBuilder()
+	// 	builder.addConditionEquality(c.partitionKey, StringValue{key})
+
+	// 	_, err = c.ddbClient.DeleteItem(context.TODO(), &dynamodb.DeleteItemInput{
+	// 		ConditionExpression:       builder.conditionExpression(),
+	// 		ExpressionAttributeNames:  builder.expressionAttributeNames(),
+	// 		ExpressionAttributeValues: builder.expressionAttributeValues(),
+	// 		Key:                       keyDef{pk: key, sk: fmt.Sprintf("%v[%v]", ListSKMember, item.ToAV().(*types.AttributeValueMemberS).Value)}.toAV(c),
+	// 		TableName:                 aws.String(c.tableName),
+	// 	})
+
+	// 	if err != nil {
+	// 		return 0, false, err
+	// 	}
+	// }
+
+	// newLength, err = c.LLEN(key)
+
+	// if err != nil {
+	// 	return 0, false, err
+	// }
+
+	return newLength, true, nil
 }
