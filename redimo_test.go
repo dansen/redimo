@@ -2,7 +2,9 @@ package redimo
 
 import (
 	"context"
+	"fmt"
 	"testing"
+	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
@@ -32,7 +34,7 @@ func TestClientBuilder(t *testing.T) {
 func newClient(t *testing.T) Client {
 	t.Parallel()
 
-	tableName := uuid.New().String()
+	tableName := fmt.Sprintf("%v-%v", time.Now().UnixMilli(), uuid.New().String())
 	indexName := "idx"
 	partitionKey := "pk"
 	sortKey := "sk"

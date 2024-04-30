@@ -253,6 +253,12 @@ func (b *expressionBuilder) addConditionLessThan(attributeName string, value Val
 	b.values[valueName] = value.ToAV()
 }
 
+func (b *expressionBuilder) addConditionGreaterThan(attributeName string, value Value) {
+	valueName := "cval" + strconv.Itoa(len(b.conditions))
+	b.condition(fmt.Sprintf("#%v > :%v", attributeName, valueName), attributeName)
+	b.values[valueName] = value.ToAV()
+}
+
 func (b *expressionBuilder) addConditionLessThanOrEqualTo(attributeName string, value Value) {
 	valueName := "cval" + strconv.Itoa(len(b.conditions))
 	b.condition(fmt.Sprintf("#%v <= :%v", attributeName, valueName), attributeName)

@@ -13,6 +13,7 @@ const (
 	ListSKMember     = "member"
 	ListSKIndexLeft  = "index_left"
 	ListSKIndexRight = "index_right"
+	ListSKIndexCount = "index_count"
 )
 
 type LSide string
@@ -36,12 +37,12 @@ func (c Client) LPOP(key string) (element ReturnValue, err error) {
 }
 
 func (c Client) createLeftIndex(key string) (index float64, err error) {
-	v, err := c.HINCRBY(key, "_sn_left_", -1)
+	v, err := c.HINCRBY(key, ListSKIndexLeft, -1)
 	return float64(v), err
 }
 
 func (c Client) createRightIndex(key string) (index float64, err error) {
-	v, err := c.HINCRBY(key, "_sn_right_", 1)
+	v, err := c.HINCRBY(key, ListSKIndexRight, 1)
 	return float64(v), err
 }
 
@@ -53,7 +54,7 @@ func (c Client) lLen(key string) (count int32, err error) {
 	for hasMoreResults {
 		builder := newExpresionBuilder()
 		builder.addConditionEquality(c.partitionKey, StringValue{key})
-		builder.addConditionEquality(c.sortKey, StringValue{ListSKMember})
+		builder.addConditionGreaterThan(c.sortKey, StringValue{ListSKIndexRight})
 
 		resp, err := c.ddbClient.Query(context.TODO(), &dynamodb.QueryInput{
 			ConsistentRead:            aws.Bool(c.consistentReads),
@@ -116,7 +117,7 @@ func (c Client) lPush(key string, left bool, vElements ...interface{}) (newLengt
 			ConditionExpression:       builder.conditionExpression(),
 			ExpressionAttributeNames:  builder.expressionAttributeNames(),
 			ExpressionAttributeValues: builder.expressionAttributeValues(),
-			Key:                       keyDef{pk: key, sk: ListSKMember}.toAV(c),
+			Key:                       keyDef{pk: key, sk: fmt.Sprintf("%v[%v]", ListSKMember, score)}.toAV(c),
 			ReturnValues:              types.ReturnValueAllOld,
 			TableName:                 aws.String(c.tableName),
 			UpdateExpression:          builder.updateExpression(),
@@ -172,7 +173,6 @@ func (c Client) lGeneralRange(key string,
 
 		builder := newExpresionBuilder()
 		builder.addConditionEquality(c.partitionKey, StringValue{key})
-		builder.addConditionEquality(c.sortKey, StringValue{ListSKMember})
 
 		if start.present() {
 			builder.values["start"] = start.ToAV()
@@ -196,6 +196,9 @@ func (c Client) lGeneralRange(key string,
 			queryIndex = aws.String(c.indexName)
 		}
 
+		fmt.Printf("lGeneralRange exp: %v names: %v values: %v", *builder.conditionExpression(),
+			builder.expressionAttributeNames(), builder.expressionAttributeValues())
+
 		resp, err := c.ddbClient.Query(context.TODO(), &dynamodb.QueryInput{
 			ConsistentRead:            aws.Bool(c.consistentReads),
 			ExclusiveStartKey:         lastKey,
@@ -206,9 +209,11 @@ func (c Client) lGeneralRange(key string,
 			Limit:                     queryLimit,
 			ScanIndexForward:          aws.Bool(forward),
 			TableName:                 aws.String(c.tableName),
+			Select:                    types.SelectAllAttributes,
 		})
 
 		if err != nil {
+			fmt.Printf("Error in lGeneralRange: %v", err)
 			return elements, err
 		}
 
