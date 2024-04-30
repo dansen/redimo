@@ -24,7 +24,13 @@ const (
 )
 
 func (c Client) LINDEX(key string, index int64) (element ReturnValue, err error) {
-	return ReturnValue{}, err
+	elements, err := c.lRange(key, index, index, true)
+
+	if err != nil || len(elements) == 0 {
+		return element, err
+	}
+
+	return elements[0], nil
 }
 
 func (c Client) LLEN(key string) (length int64, err error) {
@@ -420,46 +426,36 @@ func (c Client) RPOPLPUSH(sourceKey string, destinationKey string) (element Retu
 }
 
 func (c Client) LSET(key string, index int64, element string) (ok bool, err error) {
-	// elements, _, err := c.lGeneralRangeWithMember(key, negInf, posInf, index, 1, true, c.sortKeyNum, element)
-	return
+	// get the element at the index
+	_, items, err := c.lGeneralRangeWithItems(key, negInf, posInf, index, 1, true, c.sortKeyNum)
+
+	if err != nil || len(items) == 0 {
+		return false, err
+	}
+
+	// update value
+	builder := newExpresionBuilder()
+	builder.updateSetAV(vk, StringValue{element}.ToAV())
+	item := items[0]
+
+	_, err = c.ddbClient.UpdateItem(context.TODO(), &dynamodb.UpdateItemInput{
+		ConditionExpression:       builder.conditionExpression(),
+		ExpressionAttributeNames:  builder.expressionAttributeNames(),
+		ExpressionAttributeValues: builder.expressionAttributeValues(),
+		Key:                       keyDef{pk: key, sk: item[c.sortKeyNum].(*types.AttributeValueMemberN).Value}.toAV(c),
+		ReturnValues:              types.ReturnValueAllOld,
+		TableName:                 aws.String(c.tableName),
+		UpdateExpression:          builder.updateExpression(),
+	})
+
+	if err != nil {
+		return false, nil
+	}
+
+	return true, err
 }
 
 // LREM removes the first occurrence on the given side of the given element.
 func (c Client) LREM(key string, side LSide, vElement interface{}) (newLength int64, success bool, err error) {
-	// count := int64(1)
-	// if side == Right {
-	// 	count = -1
-	// }
-
-	// s := vElement.(*types.AttributeValueMemberS).Value
-	// elements, _, err := c.lGeneralRangeWithMember(key, negInf, posInf, 0, count, true, c.sortKeyNum, s)
-
-	// if err != nil {
-	// 	return 0, false, err
-	// }
-
-	// for _, item := range elements {
-	// 	builder := newExpresionBuilder()
-	// 	builder.addConditionEquality(c.partitionKey, StringValue{key})
-
-	// 	_, err = c.ddbClient.DeleteItem(context.TODO(), &dynamodb.DeleteItemInput{
-	// 		ConditionExpression:       builder.conditionExpression(),
-	// 		ExpressionAttributeNames:  builder.expressionAttributeNames(),
-	// 		ExpressionAttributeValues: builder.expressionAttributeValues(),
-	// 		Key:                       keyDef{pk: key, sk: fmt.Sprintf("%v[%v]", ListSKMember, item.ToAV().(*types.AttributeValueMemberS).Value)}.toAV(c),
-	// 		TableName:                 aws.String(c.tableName),
-	// 	})
-
-	// 	if err != nil {
-	// 		return 0, false, err
-	// 	}
-	// }
-
-	// newLength, err = c.LLEN(key)
-
-	// if err != nil {
-	// 	return 0, false, err
-	// }
-
 	return newLength, true, nil
 }
