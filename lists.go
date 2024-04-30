@@ -384,18 +384,43 @@ func (c Client) RPOP(key string) (element ReturnValue, err error) {
 }
 
 func (c Client) LPUSHX(key string, vElements ...interface{}) (newLength int64, err error) {
-	return
+	exist, err := c.EXISTS(key)
+
+	if err != nil || !exist {
+		return 0, err
+	}
+
+	return c.LPUSH(key, vElements...)
 }
 
 func (c Client) RPUSHX(key string, vElements ...interface{}) (newLength int64, err error) {
-	return
+	exist, err := c.EXISTS(key)
+
+	if err != nil || !exist {
+		return 0, err
+	}
+
+	return c.RPUSH(key, vElements...)
 }
 
 func (c Client) RPOPLPUSH(sourceKey string, destinationKey string) (element ReturnValue, err error) {
+	element, err = c.RPOP(sourceKey)
+
+	if err != nil {
+		return element, err
+	}
+
+	_, err = c.LPUSH(destinationKey, element)
+
+	if err != nil {
+		return element, err
+	}
+
 	return
 }
 
 func (c Client) LSET(key string, index int64, element string) (ok bool, err error) {
+	// elements, _, err := c.lGeneralRangeWithMember(key, negInf, posInf, index, 1, true, c.sortKeyNum, element)
 	return
 }
 
