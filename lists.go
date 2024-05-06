@@ -63,7 +63,7 @@ func (c Client) LPOP(key string) (element ReturnValue, err error) {
 	}
 
 	element = ReturnValue{
-		av: items[0][c.sortKey],
+		av: items[0][vk],
 	}
 	return
 }
@@ -258,11 +258,7 @@ func (c Client) lGeneralRange(key string,
 
 		for _, item := range resp.Items {
 			if index >= offset {
-				val, err := parseVal(item[c.sortKey].(*types.AttributeValueMemberS).Value)
-
-				if err != nil {
-					return elements, err
-				}
+				val := parseVal(item[c.sortKey].(*types.AttributeValueMemberS).Value)
 
 				elements = append(elements, ReturnValue{
 					av: StringValue{val}.ToAV(),
@@ -282,14 +278,14 @@ func (c Client) lGeneralRange(key string,
 	return elements, nil
 }
 
-func parseVal(sk string) (string, error) {
+func parseVal(sk string) string {
 	// sk = base64|index
 	val := strings.Split(sk, "|")[0]
 	decoded, err := base64.StdEncoding.DecodeString(val)
 	if err != nil {
-		return "", err
+		panic(err)
 	}
-	return string(decoded), nil
+	return string(decoded)
 }
 
 func (c Client) lGeneralRangeWithItems(key string,
@@ -396,7 +392,7 @@ func (c Client) RPOP(key string) (element ReturnValue, err error) {
 	builder := newExpresionBuilder()
 	builder.addConditionEquality(c.partitionKey, StringValue{key})
 
-	sk := fmt.Sprintf("%v", items[0][c.sortKey].(*types.AttributeValueMemberN).Value)
+	sk := items[0][c.sortKey].(*types.AttributeValueMemberS).Value
 
 	_, err = c.ddbClient.DeleteItem(context.TODO(), &dynamodb.DeleteItemInput{
 		ConditionExpression:       builder.conditionExpression(),
