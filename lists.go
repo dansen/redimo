@@ -316,6 +316,8 @@ func (c Client) lGeneralRangeWithItems(key string,
 
 		var filter *string
 
+		// pk = _redimo/11   sk = index_right   val = 1      pk = 11   sk = val_1 skn= 1
+
 		resp, err := c.ddbClient.Query(context.TODO(), &dynamodb.QueryInput{
 			ConsistentRead:            aws.Bool(c.consistentReads),
 			ExclusiveStartKey:         lastKey,
