@@ -52,7 +52,7 @@ func (c Client) LPOP(key string) (element ReturnValue, err error) {
 		ConditionExpression:       builder.conditionExpression(),
 		ExpressionAttributeNames:  builder.expressionAttributeNames(),
 		ExpressionAttributeValues: builder.expressionAttributeValues(),
-		Key:                       keyDef{pk: key, sk: fmt.Sprintf("%v", items[0][c.sortKey].(*types.AttributeValueMemberN).Value)}.toAV(c),
+		Key:                       keyDef{pk: key, sk: items[0][c.sortKey].(*types.AttributeValueMemberS).Value}.toAV(c),
 		TableName:                 aws.String(c.tableName),
 	})
 
@@ -60,17 +60,19 @@ func (c Client) LPOP(key string) (element ReturnValue, err error) {
 		return element, err
 	}
 
-	element = parseItem(items[0], c).val
+	element = ReturnValue{
+		av: items[0][c.sortKey],
+	}
 	return
 }
 
 func (c Client) createLeftIndex(key string) (index float64, err error) {
-	v, err := c.HINCRBY(key, ListSKIndexLeft, -1)
+	v, err := c.HINCRBY(fmt.Sprintf("_redimo/%v", key), ListSKIndexLeft, -1)
 	return float64(v), err
 }
 
 func (c Client) createRightIndex(key string) (index float64, err error) {
-	v, err := c.HINCRBY(key, ListSKIndexRight, 1)
+	v, err := c.HINCRBY(fmt.Sprintf("_redimo/%v", key), ListSKIndexRight, 1)
 	return float64(v), err
 }
 
@@ -144,7 +146,7 @@ func (c Client) lPush(key string, left bool, vElements ...interface{}) (newLengt
 			ConditionExpression:       builder.conditionExpression(),
 			ExpressionAttributeNames:  builder.expressionAttributeNames(),
 			ExpressionAttributeValues: builder.expressionAttributeValues(),
-			Key:                       keyDef{pk: key, sk: e.(types.AttributeValueMemberS).Value}.toAV(c),
+			Key:                       keyDef{pk: key, sk: e.(StringValue).S}.toAV(c),
 			ReturnValues:              types.ReturnValueAllOld,
 			TableName:                 aws.String(c.tableName),
 			UpdateExpression:          builder.updateExpression(),
@@ -249,8 +251,9 @@ func (c Client) lGeneralRange(key string,
 
 		for _, item := range resp.Items {
 			if index >= offset {
-				pi := parseItem(item, c)
-				elements = append(elements, pi.val)
+				elements = append(elements, ReturnValue{
+					av: item[c.sortKey],
+				})
 				remainingCount--
 			}
 			index++
@@ -527,8 +530,9 @@ func (c Client) lGeneralRangeWithItemsByMember(key string,
 
 		for _, item := range resp.Items {
 			if index >= offset {
-				pi := parseItem(item, c)
-				elements = append(elements, pi.val)
+				elements = append(elements, ReturnValue{
+					av: item[c.sortKey],
+				})
 				items = append(items, item)
 				remainingCount--
 			}
