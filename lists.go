@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -176,6 +177,9 @@ func (c Client) RPUSH(key string, vElements ...interface{}) (newLength int64, er
 }
 
 func (c Client) lRange(key string, start int64, stop int64, forward bool) (elements []ReturnValue, err error) {
+	if start > 0 && stop > 0 && stop < start {
+		return elements, nil
+	}
 	if start < 0 && stop < 0 {
 		return c.lGeneralRange(key, negInf, posInf, -stop-1, -start, !forward, c.sortKeyNum)
 	}
@@ -437,7 +441,7 @@ func (c Client) RPOPLPUSH(sourceKey string, destinationKey string) (element Retu
 		return element, err
 	}
 
-	_, err = c.LPUSH(destinationKey, element)
+	_, err = c.LPUSH(destinationKey, StringValue{element.String()})
 
 	if err != nil {
 		return element, err
@@ -454,16 +458,34 @@ func (c Client) LSET(key string, index int64, element string) (ok bool, err erro
 		return false, err
 	}
 
-	// update value
-	builder := newExpresionBuilder()
-	builder.updateSetAV(vk, StringValue{element}.ToAV())
 	item := items[0]
+	skn := item[c.sortKeyNum].(*types.AttributeValueMemberN).Value
+
+	sknn, err := strconv.ParseInt(skn, 10, 64)
+	if err != nil {
+		panic(err)
+	}
+
+	// delete old
+	_, err = c.ddbClient.DeleteItem(context.TODO(), &dynamodb.DeleteItemInput{
+		Key:       keyDef{pk: key, sk: item[c.sortKey].(*types.AttributeValueMemberS).Value}.toAV(c),
+		TableName: aws.String(c.tableName),
+	})
+
+	// add new
+	builder := newExpresionBuilder()
+	builder.updateSetAV(c.sortKeyNum, zScore{float64(sknn)}.ToAV())
+	builder.updateSetAV(vk, StringValue{element}.ToAV())
+
+	if err != nil {
+		return false, err
+	}
 
 	_, err = c.ddbClient.UpdateItem(context.TODO(), &dynamodb.UpdateItemInput{
 		ConditionExpression:       builder.conditionExpression(),
 		ExpressionAttributeNames:  builder.expressionAttributeNames(),
 		ExpressionAttributeValues: builder.expressionAttributeValues(),
-		Key:                       keyDef{pk: key, sk: item[c.sortKeyNum].(*types.AttributeValueMemberN).Value}.toAV(c),
+		Key:                       keyDef{pk: key, sk: genSk(element, sknn)}.toAV(c),
 		ReturnValues:              types.ReturnValueAllOld,
 		TableName:                 aws.String(c.tableName),
 		UpdateExpression:          builder.updateExpression(),
@@ -496,6 +518,9 @@ func (c Client) lGeneralRangeWithItemsByMember(key string,
 		builder := newExpresionBuilder()
 		builder.addConditionEquality(c.partitionKey, StringValue{key})
 
+		b64 := base64.StdEncoding.EncodeToString([]byte(member))
+		builder.addConditionBeginWith(c.sortKey, StringValue{fmt.Sprintf("%v|", b64)})
+
 		if start.present() {
 			builder.values["start"] = start.ToAV()
 		}
@@ -513,37 +538,19 @@ func (c Client) lGeneralRangeWithItemsByMember(key string,
 			builder.condition(fmt.Sprintf("#%v <= :stop", attribute), attribute)
 		}
 
-		var queryIndex *string
-		if attribute == c.sortKeyNum {
-			queryIndex = aws.String(c.indexName)
-		}
-
-		var filter *string
-
-		if member != "" {
-			builder.addConditionEquality(c.sortKey, StringValue{member})
-		}
-
 		resp, err := c.ddbClient.Query(context.TODO(), &dynamodb.QueryInput{
 			ConsistentRead:            aws.Bool(c.consistentReads),
 			ExclusiveStartKey:         lastKey,
 			ExpressionAttributeNames:  builder.expressionAttributeNames(),
 			ExpressionAttributeValues: builder.expressionAttributeValues(),
-			IndexName:                 queryIndex,
 			KeyConditionExpression:    builder.conditionExpression(),
-			FilterExpression:          filter,
 			Limit:                     queryLimit,
 			ScanIndexForward:          aws.Bool(forward),
 			TableName:                 aws.String(c.tableName),
 			Select:                    types.SelectAllAttributes,
 		})
 
-		fmt.Printf("lGeneralRangeWithItemsByMember condition_exp: %v\nfilter: %v\nnames: %v\nvalues: %v\n\n", *builder.conditionExpression(),
-			*filter,
-			builder.expressionAttributeNames(), builder.expressionAttributeValues())
-
 		if err != nil {
-			fmt.Printf("Error in lGeneralRange: %v", err)
 			return elements, items, err
 		}
 
@@ -568,11 +575,10 @@ func (c Client) lGeneralRangeWithItemsByMember(key string,
 	return elements, items, nil
 }
 
-// https://stackoverflow.com/questions/74728186/how-to-query-over-specific-value-in-dictionary-in-dynamodb
-// LREM removes the first occurrence on the given side of the given element.
-func (c Client) LREM(key string, side LSide, vElement interface{}) (newLength int64, success bool, err error) {
+// LREM removes [count] items from the list [key] that match [vElement]
+func (c Client) LREM(key string, count int64, vElement interface{}) (newLength int64, success bool, err error) {
 	member := vElement.(StringValue).ToAV().(*types.AttributeValueMemberS).Value
-	_, items, err := c.lGeneralRangeWithItemsByMember(key, negInf, posInf, 0, 1, side == Right, c.sortKeyNum, member)
+	_, items, err := c.lGeneralRangeWithItemsByMember(key, negInf, posInf, 0, 1, true, c.sortKeyNum, member)
 
 	if err != nil || len(items) == 0 {
 		return 0, false, err
@@ -587,7 +593,7 @@ func (c Client) LREM(key string, side LSide, vElement interface{}) (newLength in
 		ConditionExpression:       builder.conditionExpression(),
 		ExpressionAttributeNames:  builder.expressionAttributeNames(),
 		ExpressionAttributeValues: builder.expressionAttributeValues(),
-		Key:                       keyDef{pk: key, sk: item[c.sortKeyNum].(*types.AttributeValueMemberN).Value}.toAV(c),
+		Key:                       keyDef{pk: key, sk: item[c.sortKey].(*types.AttributeValueMemberS).Value}.toAV(c),
 		TableName:                 aws.String(c.tableName),
 	})
 
