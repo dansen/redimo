@@ -270,7 +270,7 @@ func (c Client) ZRANGE(key string, start, stop int32) (membersWithScores map[str
 }
 
 func (c Client) zRange(key string, start int32, stop int32, forward bool) (membersWithScores map[string]float64, err error) {
-	if start < 0 && stop < 0 {
+	if start <= 0 && stop < 0 {
 		return c.zGeneralRange(key, negInf, posInf, -stop-1, -start, !forward, c.sortKeyNum)
 	}
 
