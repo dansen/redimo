@@ -2,7 +2,9 @@ package redimo
 
 import (
 	"context"
+	"encoding/base64"
 	"fmt"
+	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
@@ -66,14 +68,14 @@ func (c Client) LPOP(key string) (element ReturnValue, err error) {
 	return
 }
 
-func (c Client) createLeftIndex(key string) (index float64, err error) {
+func (c Client) createLeftIndex(key string) (index int64, err error) {
 	v, err := c.HINCRBY(fmt.Sprintf("_redimo/%v", key), ListSKIndexLeft, -1)
-	return float64(v), err
+	return int64(v), err
 }
 
-func (c Client) createRightIndex(key string) (index float64, err error) {
+func (c Client) createRightIndex(key string) (index int64, err error) {
 	v, err := c.HINCRBY(fmt.Sprintf("_redimo/%v", key), ListSKIndexRight, 1)
-	return float64(v), err
+	return int64(v), err
 }
 
 func (c Client) lLen(key string) (count int32, err error) {
@@ -84,7 +86,6 @@ func (c Client) lLen(key string) (count int32, err error) {
 	for hasMoreResults {
 		builder := newExpresionBuilder()
 		builder.addConditionEquality(c.partitionKey, StringValue{key})
-		builder.addConditionGreaterThan(c.sortKey, StringValue{ListSKIndexRight})
 
 		resp, err := c.ddbClient.Query(context.TODO(), &dynamodb.QueryInput{
 			ConsistentRead:            aws.Bool(c.consistentReads),
@@ -97,7 +98,6 @@ func (c Client) lLen(key string) (count int32, err error) {
 		})
 
 		if err != nil {
-			fmt.Printf("Error in lLen: %v", err)
 			return count, err
 		}
 
@@ -117,6 +117,12 @@ func (c Client) LPUSH(key string, vElements ...interface{}) (newLength int64, er
 	return c.lPush(key, true, vElements...)
 }
 
+func genSk(val string, index int64) string {
+	// val to base64
+	b64 := base64.StdEncoding.EncodeToString([]byte(val))
+	return fmt.Sprintf("%s|%v", b64, index)
+}
+
 func (c Client) lPush(key string, left bool, vElements ...interface{}) (newLength int64, err error) {
 	length, err := c.LLEN(key)
 
@@ -127,7 +133,7 @@ func (c Client) lPush(key string, left bool, vElements ...interface{}) (newLengt
 	for index, e := range vElements {
 		builder := newExpresionBuilder()
 
-		var score float64
+		var score int64
 
 		if left {
 			score, err = c.createLeftIndex(key)
@@ -140,13 +146,14 @@ func (c Client) lPush(key string, left bool, vElements ...interface{}) (newLengt
 		}
 
 		// snk 是分数
-		builder.updateSetAV(c.sortKeyNum, zScore{score}.ToAV())
+		builder.updateSetAV(c.sortKeyNum, zScore{float64(score)}.ToAV())
+		builder.updateSetAV(vk, e.(StringValue).ToAV())
 
 		_, err = c.ddbClient.UpdateItem(context.TODO(), &dynamodb.UpdateItemInput{
 			ConditionExpression:       builder.conditionExpression(),
 			ExpressionAttributeNames:  builder.expressionAttributeNames(),
 			ExpressionAttributeValues: builder.expressionAttributeValues(),
-			Key:                       keyDef{pk: key, sk: e.(StringValue).S}.toAV(c),
+			Key:                       keyDef{pk: key, sk: genSk(e.(StringValue).S, score)}.toAV(c),
 			ReturnValues:              types.ReturnValueAllOld,
 			TableName:                 aws.String(c.tableName),
 			UpdateExpression:          builder.updateExpression(),
@@ -251,8 +258,14 @@ func (c Client) lGeneralRange(key string,
 
 		for _, item := range resp.Items {
 			if index >= offset {
+				val, err := parseVal(item[c.sortKey].(*types.AttributeValueMemberS).Value)
+
+				if err != nil {
+					return elements, err
+				}
+
 				elements = append(elements, ReturnValue{
-					av: item[c.sortKey],
+					av: StringValue{val}.ToAV(),
 				})
 				remainingCount--
 			}
@@ -267,6 +280,16 @@ func (c Client) lGeneralRange(key string,
 	}
 
 	return elements, nil
+}
+
+func parseVal(sk string) (string, error) {
+	// sk = base64|index
+	val := strings.Split(sk, "|")[0]
+	decoded, err := base64.StdEncoding.DecodeString(val)
+	if err != nil {
+		return "", err
+	}
+	return string(decoded), nil
 }
 
 func (c Client) lGeneralRangeWithItems(key string,
