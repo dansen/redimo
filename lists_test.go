@@ -271,9 +271,12 @@ func TestListValueBasedCRUD(t *testing.T) {
 	assert.True(t, ok)
 	assert.Equal(t, int64(3), length)
 
+	c.LPUSH("l1", StringValue{"alpha"})
+	c.RPUSH("l1", StringValue{"omega"})
+
 	elements, err := c.LRANGE("l1", 0, -1)
 	assert.NoError(t, err)
-	assert.Equal(t, []string{"alpha", "beta", "delta", "phi", "omega"}, readStrings(elements))
+	assert.Equal(t, []string{"alpha", "delta", "delta", "phi", "omega"}, readStrings(elements))
 
 	length, ok, err = c.LREM("l1", 0, StringValue{"omega"})
 	assert.NoError(t, err)

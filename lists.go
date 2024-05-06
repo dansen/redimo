@@ -578,27 +578,33 @@ func (c Client) lGeneralRangeWithItemsByMember(key string,
 // LREM removes [count] items from the list [key] that match [vElement]
 func (c Client) LREM(key string, count int64, vElement interface{}) (newLength int64, success bool, err error) {
 	member := vElement.(StringValue).ToAV().(*types.AttributeValueMemberS).Value
-	_, items, err := c.lGeneralRangeWithItemsByMember(key, negInf, posInf, 0, 1, true, c.sortKeyNum, member)
+	_, items, err := c.lGeneralRangeWithItemsByMember(key, negInf, posInf, 0, -1, true, c.sortKeyNum, member)
 
 	if err != nil || len(items) == 0 {
 		return 0, false, err
 	}
 
-	// delete item 0
-	builder := newExpresionBuilder()
-	builder.addConditionEquality(c.partitionKey, StringValue{key})
-	item := items[0]
+	if count > int64(len(items)) || count == 0 {
+		count = int64(len(items))
+	}
 
-	_, err = c.ddbClient.DeleteItem(context.TODO(), &dynamodb.DeleteItemInput{
-		ConditionExpression:       builder.conditionExpression(),
-		ExpressionAttributeNames:  builder.expressionAttributeNames(),
-		ExpressionAttributeValues: builder.expressionAttributeValues(),
-		Key:                       keyDef{pk: key, sk: item[c.sortKey].(*types.AttributeValueMemberS).Value}.toAV(c),
-		TableName:                 aws.String(c.tableName),
-	})
+	// delete [count] item
+	for i := int64(0); i < count; i++ {
+		builder := newExpresionBuilder()
+		builder.addConditionEquality(c.partitionKey, StringValue{key})
+		item := items[i]
 
-	if err != nil {
-		return 0, false, err
+		_, err = c.ddbClient.DeleteItem(context.TODO(), &dynamodb.DeleteItemInput{
+			ConditionExpression:       builder.conditionExpression(),
+			ExpressionAttributeNames:  builder.expressionAttributeNames(),
+			ExpressionAttributeValues: builder.expressionAttributeValues(),
+			Key:                       keyDef{pk: key, sk: item[c.sortKey].(*types.AttributeValueMemberS).Value}.toAV(c),
+			TableName:                 aws.String(c.tableName),
+		})
+
+		if err != nil {
+			return 0, false, err
+		}
 	}
 
 	newLength, err = c.LLEN(key)
