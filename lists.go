@@ -10,7 +10,6 @@ import (
 )
 
 const (
-	ListSKMember     = "member"
 	ListSKIndexLeft  = "index_left"
 	ListSKIndexRight = "index_right"
 	ListSKIndexCount = "index_count"
@@ -45,7 +44,6 @@ func (c Client) LPOP(key string) (element ReturnValue, err error) {
 		return element, err
 	}
 
-	fmt.Printf("LPOP items: %v\n", items)
 	// delete item 0
 	builder := newExpresionBuilder()
 	builder.addConditionEquality(c.partitionKey, StringValue{key})
@@ -54,7 +52,7 @@ func (c Client) LPOP(key string) (element ReturnValue, err error) {
 		ConditionExpression:       builder.conditionExpression(),
 		ExpressionAttributeNames:  builder.expressionAttributeNames(),
 		ExpressionAttributeValues: builder.expressionAttributeValues(),
-		Key:                       keyDef{pk: key, sk: fmt.Sprintf("%v[%v]", ListSKMember, items[0][c.sortKeyNum].(*types.AttributeValueMemberN).Value)}.toAV(c),
+		Key:                       keyDef{pk: key, sk: fmt.Sprintf("%v", items[0][c.sortKey].(*types.AttributeValueMemberN).Value)}.toAV(c),
 		TableName:                 aws.String(c.tableName),
 	})
 
@@ -141,13 +139,12 @@ func (c Client) lPush(key string, left bool, vElements ...interface{}) (newLengt
 
 		// snk 是分数
 		builder.updateSetAV(c.sortKeyNum, zScore{score}.ToAV())
-		builder.updateSetAV(vk, e.(Value).ToAV())
 
 		_, err = c.ddbClient.UpdateItem(context.TODO(), &dynamodb.UpdateItemInput{
 			ConditionExpression:       builder.conditionExpression(),
 			ExpressionAttributeNames:  builder.expressionAttributeNames(),
 			ExpressionAttributeValues: builder.expressionAttributeValues(),
-			Key:                       keyDef{pk: key, sk: fmt.Sprintf("%v[%v]", ListSKMember, score)}.toAV(c),
+			Key:                       keyDef{pk: key, sk: e.(types.AttributeValueMemberS).Value}.toAV(c),
 			ReturnValues:              types.ReturnValueAllOld,
 			TableName:                 aws.String(c.tableName),
 			UpdateExpression:          builder.updateExpression(),
@@ -373,7 +370,7 @@ func (c Client) RPOP(key string) (element ReturnValue, err error) {
 	builder := newExpresionBuilder()
 	builder.addConditionEquality(c.partitionKey, StringValue{key})
 
-	sk := fmt.Sprintf("%v[%v]", ListSKMember, items[0][c.sortKeyNum].(*types.AttributeValueMemberN).Value)
+	sk := fmt.Sprintf("%v", items[0][c.sortKey].(*types.AttributeValueMemberN).Value)
 
 	_, err = c.ddbClient.DeleteItem(context.TODO(), &dynamodb.DeleteItemInput{
 		ConditionExpression:       builder.conditionExpression(),
@@ -466,7 +463,7 @@ func (c Client) lGeneralRangeWithItemsByMember(key string,
 	remainingCount := count
 	hasMoreResults := true
 
-	// var lastKey map[string]types.AttributeValue
+	var lastKey map[string]types.AttributeValue
 
 	for hasMoreResults {
 		var queryLimit *int32
@@ -494,34 +491,29 @@ func (c Client) lGeneralRangeWithItemsByMember(key string,
 			builder.condition(fmt.Sprintf("#%v <= :stop", attribute), attribute)
 		}
 
-		// var queryIndex *string
-		// if attribute == c.sortKeyNum {
-		// 	queryIndex = aws.String(c.indexName)
-		// }
+		var queryIndex *string
+		if attribute == c.sortKeyNum {
+			queryIndex = aws.String(c.indexName)
+		}
 
 		var filter *string
 
 		if member != "" {
-			filter = aws.String("#val = :member")
-			// set key
-			builder.keys["val"] = struct{}{}
-
-			// set value
-			builder.values["member"] = StringValue{member}.ToAV()
+			builder.addConditionEquality(c.sortKey, StringValue{member})
 		}
 
 		resp, err := c.ddbClient.Query(context.TODO(), &dynamodb.QueryInput{
-			ConsistentRead: aws.Bool(c.consistentReads),
-			// ExclusiveStartKey:         lastKey,
+			ConsistentRead:            aws.Bool(c.consistentReads),
+			ExclusiveStartKey:         lastKey,
 			ExpressionAttributeNames:  builder.expressionAttributeNames(),
 			ExpressionAttributeValues: builder.expressionAttributeValues(),
-			// IndexName:                 queryIndex,
-			KeyConditionExpression: builder.conditionExpression(),
-			FilterExpression:       filter,
-			Limit:                  queryLimit,
-			ScanIndexForward:       aws.Bool(forward),
-			TableName:              aws.String(c.tableName),
-			Select:                 types.SelectAllAttributes,
+			IndexName:                 queryIndex,
+			KeyConditionExpression:    builder.conditionExpression(),
+			FilterExpression:          filter,
+			Limit:                     queryLimit,
+			ScanIndexForward:          aws.Bool(forward),
+			TableName:                 aws.String(c.tableName),
+			Select:                    types.SelectAllAttributes,
 		})
 
 		fmt.Printf("lGeneralRangeWithItemsByMember condition_exp: %v\nfilter: %v\nnames: %v\nvalues: %v\n\n", *builder.conditionExpression(),
@@ -544,7 +536,7 @@ func (c Client) lGeneralRangeWithItemsByMember(key string,
 		}
 
 		if len(resp.LastEvaluatedKey) > 0 && remainingCount > 0 {
-			// lastKey = resp.LastEvaluatedKey
+			lastKey = resp.LastEvaluatedKey
 		} else {
 			hasMoreResults = false
 		}
