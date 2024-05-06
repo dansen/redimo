@@ -464,7 +464,7 @@ func (c Client) lGeneralRangeWithItemsByMember(key string,
 	remainingCount := count
 	hasMoreResults := true
 
-	var lastKey map[string]types.AttributeValue
+	// var lastKey map[string]types.AttributeValue
 
 	for hasMoreResults {
 		var queryLimit *int32
@@ -492,29 +492,39 @@ func (c Client) lGeneralRangeWithItemsByMember(key string,
 			builder.condition(fmt.Sprintf("#%v <= :stop", attribute), attribute)
 		}
 
-		var queryIndex *string
-		if attribute == c.sortKeyNum {
-			queryIndex = aws.String(c.indexName)
-		}
-
-		fmt.Printf("lGeneralRange exp: %v names: %v values: %v\n", *builder.conditionExpression(),
-			builder.expressionAttributeNames(), builder.expressionAttributeValues())
+		// var queryIndex *string
+		// if attribute == c.sortKeyNum {
+		// 	queryIndex = aws.String(c.indexName)
+		// }
 
 		var filter *string
 
+		if member != "" {
+			filter = aws.String("#val = :member")
+			// set key
+			builder.keys["val"] = struct{}{}
+
+			// set value
+			builder.values["member"] = StringValue{member}.ToAV()
+		}
+
 		resp, err := c.ddbClient.Query(context.TODO(), &dynamodb.QueryInput{
-			ConsistentRead:            aws.Bool(c.consistentReads),
-			ExclusiveStartKey:         lastKey,
+			ConsistentRead: aws.Bool(c.consistentReads),
+			// ExclusiveStartKey:         lastKey,
 			ExpressionAttributeNames:  builder.expressionAttributeNames(),
 			ExpressionAttributeValues: builder.expressionAttributeValues(),
-			IndexName:                 queryIndex,
-			KeyConditionExpression:    builder.conditionExpression(),
-			FilterExpression:          filter,
-			Limit:                     queryLimit,
-			ScanIndexForward:          aws.Bool(forward),
-			TableName:                 aws.String(c.tableName),
-			Select:                    types.SelectAllAttributes,
+			// IndexName:                 queryIndex,
+			KeyConditionExpression: builder.conditionExpression(),
+			FilterExpression:       filter,
+			Limit:                  queryLimit,
+			ScanIndexForward:       aws.Bool(forward),
+			TableName:              aws.String(c.tableName),
+			Select:                 types.SelectAllAttributes,
 		})
+
+		fmt.Printf("lGeneralRangeWithItemsByMember condition_exp: %v\nfilter: %v\nnames: %v\nvalues: %v\n\n", *builder.conditionExpression(),
+			*filter,
+			builder.expressionAttributeNames(), builder.expressionAttributeValues())
 
 		if err != nil {
 			fmt.Printf("Error in lGeneralRange: %v", err)
@@ -532,7 +542,7 @@ func (c Client) lGeneralRangeWithItemsByMember(key string,
 		}
 
 		if len(resp.LastEvaluatedKey) > 0 && remainingCount > 0 {
-			lastKey = resp.LastEvaluatedKey
+			// lastKey = resp.LastEvaluatedKey
 		} else {
 			hasMoreResults = false
 		}
@@ -541,9 +551,10 @@ func (c Client) lGeneralRangeWithItemsByMember(key string,
 	return elements, items, nil
 }
 
+// https://stackoverflow.com/questions/74728186/how-to-query-over-specific-value-in-dictionary-in-dynamodb
 // LREM removes the first occurrence on the given side of the given element.
 func (c Client) LREM(key string, side LSide, vElement interface{}) (newLength int64, success bool, err error) {
-	member := vElement.(types.AttributeValueMemberS).Value
+	member := vElement.(StringValue).ToAV().(*types.AttributeValueMemberS).Value
 	_, items, err := c.lGeneralRangeWithItemsByMember(key, negInf, posInf, 0, 1, side == Right, c.sortKeyNum, member)
 
 	if err != nil || len(items) == 0 {
@@ -574,3 +585,5 @@ func (c Client) LREM(key string, side LSide, vElement interface{}) (newLength in
 
 	return newLength, true, nil
 }
+
+// TODO LTRIM

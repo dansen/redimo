@@ -262,32 +262,16 @@ func TestListIndexBasedCRUD(t *testing.T) {
 func TestListValueBasedCRUD(t *testing.T) {
 	c := newClient(t)
 
-	length, err := c.RPUSH("l1", StringValue{"beta"}, StringValue{"delta"}, StringValue{"phi"})
+	length, err := c.RPUSH("l1", StringValue{"delta"}, StringValue{"beta"}, StringValue{"beta"}, StringValue{"delta"}, StringValue{"phi"})
 	assert.NoError(t, err)
+	assert.Equal(t, int64(5), length)
+
+	length, ok, err := c.LREM("l1", Left, StringValue{"beta"})
+	assert.NoError(t, err)
+	assert.True(t, ok)
 	assert.Equal(t, int64(3), length)
 
 	elements, err := c.LRANGE("l1", 0, -1)
-	assert.NoError(t, err)
-	assert.Equal(t, []string{"beta", "delta", "phi"}, readStrings(elements))
-
-	elements, err = c.LRANGE("l1", 0, -1)
-	assert.NoError(t, err)
-	assert.Equal(t, []string{"beta", "gamma", "delta", "phi"}, readStrings(elements))
-
-	elements, err = c.LRANGE("l1", 0, -1)
-	assert.NoError(t, err)
-	assert.Equal(t, []string{"alpha", "beta", "gamma", "delta", "phi"}, readStrings(elements))
-
-	elements, err = c.LRANGE("l1", 0, -1)
-	assert.NoError(t, err)
-	assert.Equal(t, []string{"alpha", "beta", "gamma", "delta", "phi", "omega"}, readStrings(elements))
-
-	length, ok, err := c.LREM("l1", Left, StringValue{"gamma"})
-	assert.NoError(t, err)
-	assert.True(t, ok)
-	assert.Equal(t, int64(5), length)
-
-	elements, err = c.LRANGE("l1", 0, -1)
 	assert.NoError(t, err)
 	assert.Equal(t, []string{"alpha", "beta", "delta", "phi", "omega"}, readStrings(elements))
 
