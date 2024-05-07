@@ -180,6 +180,7 @@ func (c Client) lRange(key string, start int64, stop int64, forward bool) (eleme
 	if start > 0 && stop > 0 && stop < start {
 		return elements, nil
 	}
+
 	if start < 0 && stop < 0 {
 		return c.lGeneralRange(key, negInf, posInf, -stop-1, -start, !forward, c.sortKeyNum)
 	}
