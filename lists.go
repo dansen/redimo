@@ -498,7 +498,7 @@ func (c Client) LSET(key string, index int64, element string) (ok bool, err erro
 
 func (c Client) lGeneralRangeWithItemsByMember(key string,
 	offset int64, count int64,
-	forward bool, attribute string, member string) (elements []ReturnValue, items []map[string]types.AttributeValue, err error) {
+	forward bool, member string) (elements []ReturnValue, items []map[string]types.AttributeValue, err error) {
 	llen, err := c.LLEN(key)
 	if err != nil {
 		return elements, items, err
@@ -595,11 +595,11 @@ func (c Client) LREM(key string, count int64, vElement interface{}) (newLength i
 	var items []map[string]types.AttributeValue
 
 	if count == 0 {
-		_, items, err = c.lGeneralRangeWithItemsByMember(key, 0, -1, true, c.sortKeyNum, member)
+		_, items, err = c.lGeneralRangeWithItemsByMember(key, 0, -1, true, member)
 	} else if count > 0 {
-		_, items, err = c.lGeneralRangeWithItemsByMember(key, 0, count, true, c.sortKeyNum, member)
+		_, items, err = c.lGeneralRangeWithItemsByMember(key, 0, count, true, member)
 	} else {
-		_, items, err = c.lGeneralRangeWithItemsByMember(key, -count, -1, true, c.sortKeyNum, member)
+		_, items, err = c.lGeneralRangeWithItemsByMember(key, -count, -1, true, member)
 	}
 
 	if err != nil || len(items) == 0 {
