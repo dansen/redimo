@@ -271,12 +271,15 @@ func TestListValueBasedCRUD(t *testing.T) {
 	assert.True(t, ok)
 	assert.Equal(t, int64(3), length)
 
+	c.LREM("l1", 0, StringValue{"delta"})
+	c.LPUSH("l1", StringValue{"delta"})
+	c.LPUSH("l1", StringValue{"beta"})
 	c.LPUSH("l1", StringValue{"alpha"})
 	c.RPUSH("l1", StringValue{"omega"})
 
 	elements, err := c.LRANGE("l1", 0, -1)
 	assert.NoError(t, err)
-	assert.Equal(t, []string{"alpha", "delta", "delta", "phi", "omega"}, readStrings(elements))
+	assert.Equal(t, []string{"alpha", "beta", "delta", "phi", "omega"}, readStrings(elements))
 
 	length, ok, err = c.LREM("l1", 0, StringValue{"omega"})
 	assert.NoError(t, err)
@@ -304,7 +307,7 @@ func TestListValueBasedCRUD(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, []string{"beta", "delta", "phi", "delta", "gamma", "delta", "mu"}, readStrings(elements))
 
-	length, ok, err = c.LREM("l1", 0, StringValue{"delta"})
+	length, ok, err = c.LREM("l1", 1, StringValue{"delta"})
 	assert.NoError(t, err)
 	assert.True(t, ok)
 	assert.Equal(t, int64(6), length)
@@ -313,7 +316,7 @@ func TestListValueBasedCRUD(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, []string{"beta", "phi", "delta", "gamma", "delta", "mu"}, readStrings(elements))
 
-	length, ok, err = c.LREM("l1", 0, StringValue{"delta"})
+	length, ok, err = c.LREM("l1", -1, StringValue{"delta"})
 	assert.NoError(t, err)
 	assert.True(t, ok)
 	assert.Equal(t, int64(5), length)
@@ -322,7 +325,7 @@ func TestListValueBasedCRUD(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, []string{"beta", "phi", "delta", "gamma", "mu"}, readStrings(elements))
 
-	_, ok, err = c.LREM("l1", 0, StringValue{"no such element"})
+	_, ok, err = c.LREM("l1", 1, StringValue{"no such element"})
 	assert.NoError(t, err)
 	assert.False(t, ok)
 }

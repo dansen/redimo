@@ -497,9 +497,42 @@ func (c Client) LSET(key string, index int64, element string) (ok bool, err erro
 }
 
 func (c Client) lGeneralRangeWithItemsByMember(key string,
-	start rangeCap, stop rangeCap,
 	offset int64, count int64,
 	forward bool, attribute string, member string) (elements []ReturnValue, items []map[string]types.AttributeValue, err error) {
+	llen, err := c.LLEN(key)
+	if err != nil {
+		return elements, items, err
+	}
+
+	start := offset
+	end := offset + count - 1
+
+	if start < 0 {
+		start = llen + start
+	}
+
+	if end < 0 {
+		end = llen + end
+	}
+
+	if start < 0 {
+		start = 0
+	}
+
+	if end >= llen {
+		end = llen - 1
+	}
+
+	if start > end || start >= llen {
+		return elements, items, nil
+	}
+
+	count = end - start + 1
+	return c.lGeneralRangeWithItemsByMember_(key, offset, count, forward, member)
+}
+
+func (c Client) lGeneralRangeWithItemsByMember_(key string, offset int64, count int64,
+	forward bool, member string) (elements []ReturnValue, items []map[string]types.AttributeValue, err error) {
 	elements = make([]ReturnValue, 0)
 	index := int64(0)
 	remainingCount := count
@@ -518,23 +551,6 @@ func (c Client) lGeneralRangeWithItemsByMember(key string,
 
 		b64 := base64.StdEncoding.EncodeToString([]byte(member))
 		builder.addConditionBeginWith(c.sortKey, StringValue{fmt.Sprintf("%v|", b64)})
-
-		if start.present() {
-			builder.values["start"] = start.ToAV()
-		}
-
-		if stop.present() {
-			builder.values["stop"] = stop.ToAV()
-		}
-
-		switch {
-		case start.present() && stop.present():
-			builder.condition(fmt.Sprintf("#%v BETWEEN :start AND :stop", attribute), attribute)
-		case start.present():
-			builder.condition(fmt.Sprintf("#%v >= :start", attribute), attribute)
-		case stop.present():
-			builder.condition(fmt.Sprintf("#%v <= :stop", attribute), attribute)
-		}
 
 		resp, err := c.ddbClient.Query(context.TODO(), &dynamodb.QueryInput{
 			ConsistentRead:            aws.Bool(c.consistentReads),
@@ -576,10 +592,22 @@ func (c Client) lGeneralRangeWithItemsByMember(key string,
 // LREM removes [count] items from the list [key] that match [vElement]
 func (c Client) LREM(key string, count int64, vElement interface{}) (newLength int64, success bool, err error) {
 	member := vElement.(StringValue).ToAV().(*types.AttributeValueMemberS).Value
-	_, items, err := c.lGeneralRangeWithItemsByMember(key, negInf, posInf, 0, -1, true, c.sortKeyNum, member)
+	var items []map[string]types.AttributeValue
+
+	if count == 0 {
+		_, items, err = c.lGeneralRangeWithItemsByMember(key, 0, -1, true, c.sortKeyNum, member)
+	} else if count > 0 {
+		_, items, err = c.lGeneralRangeWithItemsByMember(key, 0, count, true, c.sortKeyNum, member)
+	} else {
+		_, items, err = c.lGeneralRangeWithItemsByMember(key, -count, -1, true, c.sortKeyNum, member)
+	}
 
 	if err != nil || len(items) == 0 {
 		return 0, false, err
+	}
+
+	if count < 0 {
+		count = -count
 	}
 
 	if count > int64(len(items)) || count == 0 {
