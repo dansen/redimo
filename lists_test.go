@@ -238,13 +238,13 @@ func TestListIndexBasedCRUD(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, "monty", element.String())
 
-	// ok, err = c.LSET("l1", -2, "mama")
-	// assert.NoError(t, err)
-	// assert.True(t, ok)
+	ok, err = c.LSET("l1", -2, "mama")
+	assert.NoError(t, err)
+	assert.True(t, ok)
 
-	// element, err = c.LINDEX("l1", -2)
-	// assert.NoError(t, err)
-	// assert.Equal(t, "mama", element.String())
+	element, err = c.LINDEX("l1", -2)
+	assert.NoError(t, err)
+	assert.Equal(t, "mama", element.String())
 
 	ok, err = c.LSET("l1", 42, "no chance")
 	assert.NoError(t, err)

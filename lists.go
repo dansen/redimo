@@ -194,10 +194,6 @@ func (c Client) lRange(key string, start int64, end int64, forward bool) (elemen
 		start = 0
 	}
 
-	if end < 0 {
-		end = 0
-	}
-
 	if end >= llen {
 		end = llen - 1
 	}
