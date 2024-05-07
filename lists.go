@@ -280,7 +280,6 @@ func parseVal(sk string) string {
 }
 
 func (c Client) lGeneralRangeWithItems(key string,
-	start rangeCap, stop rangeCap,
 	offset int64, count int64,
 	forward bool, attribute string) (elements []ReturnValue, items []map[string]types.AttributeValue, err error) {
 	elements = make([]ReturnValue, 0)
@@ -299,34 +298,10 @@ func (c Client) lGeneralRangeWithItems(key string,
 		builder := newExpresionBuilder()
 		builder.addConditionEquality(c.partitionKey, StringValue{key})
 
-		if start.present() {
-			builder.values["start"] = start.ToAV()
-		}
-
-		if stop.present() {
-			builder.values["stop"] = stop.ToAV()
-		}
-
-		switch {
-		case start.present() && stop.present():
-			builder.condition(fmt.Sprintf("#%v BETWEEN :start AND :stop", attribute), attribute)
-		case start.present():
-			builder.condition(fmt.Sprintf("#%v >= :start", attribute), attribute)
-		case stop.present():
-			builder.condition(fmt.Sprintf("#%v <= :stop", attribute), attribute)
-		}
-
 		var queryIndex *string
 		if attribute == c.sortKeyNum {
 			queryIndex = aws.String(c.indexName)
 		}
-
-		fmt.Printf("lGeneralRange exp: %v names: %v values: %v\n", *builder.conditionExpression(),
-			builder.expressionAttributeNames(), builder.expressionAttributeValues())
-
-		var filter *string
-
-		// pk = _redimo/11   sk = index_right   val = 1      pk = 11   sk = val_1 skn= 1
 
 		resp, err := c.ddbClient.Query(context.TODO(), &dynamodb.QueryInput{
 			ConsistentRead:            aws.Bool(c.consistentReads),
@@ -335,7 +310,6 @@ func (c Client) lGeneralRangeWithItems(key string,
 			ExpressionAttributeValues: builder.expressionAttributeValues(),
 			IndexName:                 queryIndex,
 			KeyConditionExpression:    builder.conditionExpression(),
-			FilterExpression:          filter,
 			Limit:                     queryLimit,
 			ScanIndexForward:          aws.Bool(forward),
 			TableName:                 aws.String(c.tableName),
@@ -372,7 +346,7 @@ func (c Client) LRANGE(key string, start, stop int64) (elements []ReturnValue, e
 }
 
 func (c Client) RPOP(key string) (element ReturnValue, err error) {
-	_, items, err := c.lGeneralRangeWithItems(key, negInf, posInf, 0, 1, false, c.sortKeyNum)
+	_, items, err := c.lGeneralRangeWithItems(key, 0, 1, false, c.sortKeyNum)
 
 	if err != nil || len(items) == 0 {
 		return element, err
@@ -439,7 +413,7 @@ func (c Client) RPOPLPUSH(sourceKey string, destinationKey string) (element Retu
 
 func (c Client) LSET(key string, index int64, element string) (ok bool, err error) {
 	// get the element at the index
-	_, items, err := c.lGeneralRangeWithItems(key, negInf, posInf, index, 1, true, c.sortKeyNum)
+	_, items, err := c.lGeneralRangeWithItems(key, index, 1, true, c.sortKeyNum)
 
 	if err != nil || len(items) == 0 {
 		return false, err
