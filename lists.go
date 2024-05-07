@@ -41,7 +41,7 @@ func (c Client) LLEN(key string) (length int64, err error) {
 }
 
 func (c Client) LPOP(key string) (element ReturnValue, err error) {
-	_, items, err := c.lGeneralRangeWithItems(key, negInf, posInf, 0, 1, true, c.sortKeyNum)
+	_, items, err := c.lGeneralRangeWithItems(key, 0, 1, true, c.sortKeyNum)
 
 	if err != nil || len(items) == 0 {
 		return element, err
@@ -280,6 +280,43 @@ func parseVal(sk string) string {
 }
 
 func (c Client) lGeneralRangeWithItems(key string,
+	offset int64, count int64,
+	forward bool, attribute string) (elements []ReturnValue, items []map[string]types.AttributeValue, err error) {
+
+	llen, err := c.LLEN(key)
+	if err != nil {
+		return elements, items, err
+	}
+
+	start := offset
+	end := offset + count - 1
+
+	if start < 0 {
+		start = llen + start
+	}
+
+	if end < 0 {
+		end = llen + end
+	}
+
+	if start < 0 {
+		start = 0
+	}
+
+	if end >= llen {
+		end = llen - 1
+	}
+
+	if start > end || start >= llen {
+		return elements, items, nil
+	}
+
+	count = end - start + 1
+
+	return c.lGeneralRangeWithItems_(key, start, count, forward, attribute)
+}
+
+func (c Client) lGeneralRangeWithItems_(key string,
 	offset int64, count int64,
 	forward bool, attribute string) (elements []ReturnValue, items []map[string]types.AttributeValue, err error) {
 	elements = make([]ReturnValue, 0)
