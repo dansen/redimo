@@ -176,29 +176,42 @@ func (c Client) RPUSH(key string, vElements ...interface{}) (newLength int64, er
 	return c.lPush(key, false, vElements...)
 }
 
-func (c Client) lRange(key string, start int64, stop int64, forward bool) (elements []ReturnValue, err error) {
-	if start > 0 && stop > 0 && stop < start {
+func (c Client) lRange(key string, start int64, end int64, forward bool) (elements []ReturnValue, err error) {
+	llen, err := c.LLEN(key)
+	if err != nil {
+		return elements, err
+	}
+
+	if start < 0 {
+		start = llen + start
+	}
+
+	if end < 0 {
+		end = llen + end
+	}
+
+	if start < 0 {
+		start = 0
+	}
+
+	if end < 0 {
+		end = 0
+	}
+
+	if end >= llen {
+		end = llen - 1
+	}
+
+	if start > end || start >= llen {
 		return elements, nil
 	}
 
-	if start < 0 && stop < 0 {
-		return c.lGeneralRange(key, negInf, posInf, -stop-1, -start, !forward, c.sortKeyNum)
-	}
-
-	if start > 0 && stop < 0 {
-		elements, err := c.lGeneralRange(key, negInf, posInf, -stop-1, 1, !forward, c.sortKeyNum)
-		if err != nil {
-			return elements, err
-		}
-	}
-
-	return c.lGeneralRange(key, negInf, posInf, start, stop-start+1, forward, c.sortKeyNum)
+	count := end - start + 1
+	return c.lGeneralRange(key, start, count, forward, c.sortKeyNum)
 }
 
-func (c Client) lGeneralRange(key string,
-	start rangeCap, stop rangeCap,
-	offset int64, count int64,
-	forward bool, attribute string) (elements []ReturnValue, err error) {
+// offset 为起点
+func (c Client) lGeneralRange(key string, offset int64, count int64, forward bool, attribute string) (elements []ReturnValue, err error) {
 	elements = make([]ReturnValue, 0)
 	index := int64(0)
 	remainingCount := count
@@ -215,32 +228,10 @@ func (c Client) lGeneralRange(key string,
 		builder := newExpresionBuilder()
 		builder.addConditionEquality(c.partitionKey, StringValue{key})
 
-		if start.present() {
-			builder.values["start"] = start.ToAV()
-		}
-
-		if stop.present() {
-			builder.values["stop"] = stop.ToAV()
-		}
-
-		switch {
-		case start.present() && stop.present():
-			builder.condition(fmt.Sprintf("#%v BETWEEN :start AND :stop", attribute), attribute)
-		case start.present():
-			builder.condition(fmt.Sprintf("#%v >= :start", attribute), attribute)
-		case stop.present():
-			builder.condition(fmt.Sprintf("#%v <= :stop", attribute), attribute)
-		}
-
 		var queryIndex *string
 		if attribute == c.sortKeyNum {
 			queryIndex = aws.String(c.indexName)
 		}
-
-		fmt.Printf("lGeneralRange exp: %v names: %v values: %v\n", *builder.conditionExpression(),
-			builder.expressionAttributeNames(), builder.expressionAttributeValues())
-
-		var filter *string
 
 		resp, err := c.ddbClient.Query(context.TODO(), &dynamodb.QueryInput{
 			ConsistentRead:            aws.Bool(c.consistentReads),
@@ -249,7 +240,6 @@ func (c Client) lGeneralRange(key string,
 			ExpressionAttributeValues: builder.expressionAttributeValues(),
 			IndexName:                 queryIndex,
 			KeyConditionExpression:    builder.conditionExpression(),
-			FilterExpression:          filter,
 			Limit:                     queryLimit,
 			ScanIndexForward:          aws.Bool(forward),
 			TableName:                 aws.String(c.tableName),
