@@ -35,6 +35,7 @@ type BenchClient struct {
 	TableName   string
 	Rand        *rand.Rand
 	EnableCheck bool
+	Lock        sync.Mutex
 }
 
 const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
@@ -111,6 +112,15 @@ func (b *BenchClient) AssertErrNil(err error) {
 
 func (b *BenchClient) CheckEqual() {
 	if !b.EnableCheck {
+		b.Lock.Lock()
+		defer b.Lock.Unlock()
+		elements, err := b.Client.LRANGE(b.TableName, 0, -1)
+		b.AssertErrNil(err)
+
+		b.List = make([]string, 0)
+		for _, e := range elements {
+			b.List = append(b.List, e.String())
+		}
 		return
 	}
 
