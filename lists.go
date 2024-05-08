@@ -655,7 +655,7 @@ func (c Client) LREM(key string, count int64, vElement interface{}) (newLength i
 	return newLength, true, nil
 }
 
-func (c Client) normalStartStop(llen int64, start int64, stop int64) (int64, int64) {
+func (c Client) normalizeStartStop(llen int64, start int64, stop int64) (int64, int64) {
 	end := stop
 
 	if start < 0 {
@@ -730,7 +730,7 @@ func (c Client) LTRIM(key string, start int64, stop int64) (newLength int64, err
 		return
 	}
 
-	start, stop = c.normalStartStop(llen, start, stop)
+	start, stop = c.normalizeStartStop(llen, start, stop)
 
 	if start == -1 {
 		return llen, nil
