@@ -1,10 +1,181 @@
 package redimo
 
 import (
+	"fmt"
+	"math/rand"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 )
+
+const (
+	StepActionLPush = iota
+	StepActionRPush
+	StepActionLPop
+	StepActionRPop
+	StepActionLRange
+	StepActionLIndex
+	StepActionLSet
+	StepActionLRem
+	StepActionLTrim
+	StepActionRPopLPush
+	StepActionLLen
+)
+
+type BenchClient struct {
+	List      []string
+	Client    Client
+	TableName string
+}
+
+const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+
+func stringWithCharset(length int64, charset string) string {
+	seed := rand.NewSource(time.Now().UnixNano())
+	r := rand.New(seed)
+	b := make([]byte, length)
+	for i := range b {
+		b[i] = charset[r.Intn(len(charset))]
+	}
+	return string(b)
+}
+
+func String() string {
+	length := rand.Int63()%5 + 3
+	return stringWithCharset(length, charset)
+}
+
+func newBenchClient(t *testing.T) *BenchClient {
+	c := newClient(t)
+	return &BenchClient{Client: c, TableName: "l1"}
+}
+
+func (b *BenchClient) AssertErrNil(err error) {
+	if err != nil {
+		panic(err)
+	}
+}
+
+func (b *BenchClient) CheckEqual() {
+	elements, err := b.Client.LRANGE(b.TableName, 0, -1)
+	b.AssertErrNil(err)
+
+	for i, e := range elements {
+		if e.String() != b.List[i] {
+			panic("Not equal")
+		}
+	}
+}
+
+func (b *BenchClient) IsSizeLimit() bool {
+	return len(b.List) > 100
+}
+
+func (b *BenchClient) ActionLPush() {
+	if b.IsSizeLimit() {
+		return
+	}
+
+	s := String()
+	b.List = append([]string{s}, b.List...)
+	fmt.Printf("LPush %s\n", s)
+	fmt.Printf("List %v\n", b.List)
+
+	_, err := b.Client.LPUSH(b.TableName, StringValue{s})
+	b.AssertErrNil(err)
+	b.CheckEqual()
+}
+
+func (b *BenchClient) ActionRPush() {
+	if b.IsSizeLimit() {
+		return
+	}
+
+	s := String()
+	b.List = append(b.List, s)
+	fmt.Printf("RPush %s\n", s)
+	fmt.Printf("List %v\n", b.List)
+
+	_, err := b.Client.RPUSH(b.TableName, StringValue{s})
+	b.AssertErrNil(err)
+	b.CheckEqual()
+}
+
+func (b *BenchClient) ActionLPop() {
+	print("LPop\n")
+}
+
+func (b *BenchClient) ActionRPop() {
+	print("RPop\n")
+}
+
+func (b *BenchClient) ActionLRange() {
+	print("LRange\n")
+}
+
+func (b *BenchClient) ActionLIndex() {
+	print("LIndex\n")
+}
+
+func (b *BenchClient) ActionLSet() {
+	print("LSet\n")
+}
+
+func (b *BenchClient) ActionLRem() {
+	print("LRem\n")
+}
+
+func (b *BenchClient) ActionLTrim() {
+	print("LTrim\n")
+}
+
+func (b *BenchClient) ActionRPopLPush() {
+	print("RPopLPush\n")
+}
+
+func (b *BenchClient) ActionLLen() {
+	print("LLen\n")
+}
+
+func (b *BenchClient) Step() bool {
+	switch rand.Intn(10) {
+	case StepActionLPush:
+		b.ActionLPush()
+	case StepActionRPush:
+		b.ActionRPush()
+	case StepActionLPop:
+		b.ActionLPop()
+	case StepActionRPop:
+		b.ActionRPop()
+	case StepActionLRange:
+		b.ActionLRange()
+	case StepActionLIndex:
+		b.ActionLIndex()
+	case StepActionLSet:
+		b.ActionLSet()
+	case StepActionLRem:
+		b.ActionLRem()
+	case StepActionLTrim:
+		b.ActionLTrim()
+	case StepActionRPopLPush:
+		b.ActionRPopLPush()
+	case StepActionLLen:
+		b.ActionLLen()
+	}
+
+	return true
+}
+
+func TestSingleThread(t *testing.T) {
+	c := newBenchClient(t)
+
+	for i := 0; i < 1000; i++ {
+		if !c.Step() {
+			break
+		}
+	}
+}
 
 func TestLBasics(t *testing.T) {
 	c := newClient(t)
