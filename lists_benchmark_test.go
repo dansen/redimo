@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"math/rand"
 	"testing"
-	"time"
 )
 
 const (
@@ -14,8 +13,10 @@ const (
 	StepActionRPop
 	StepActionLRange // negative test ok
 	StepActionLIndex // negative test
-	StepActionLSet
-	StepActionLRem
+	StepActionLSet   // negative test
+	StepActionLRem0
+	StepActionLRem1
+	StepActionLRemN1
 	StepActionLTrim
 	StepActionRPopLPush
 	StepActionLLen
@@ -23,6 +24,7 @@ const (
 	StepActionLPush2
 	StepActionRPush1
 	StepActionRPush2
+	StepActionMax
 )
 
 type BenchClient struct {
@@ -60,11 +62,15 @@ func (b *BenchClient) String() string {
 
 func newBenchClient(t *testing.T) *BenchClient {
 	c := newClient(t)
+
+	// seed := time.Now().UnixNano()
+	seed := int64(1715156636706749400)
+	fmt.Printf("Seed %d\n", seed)
+
 	return &BenchClient{
 		Client:    c,
 		TableName: "l1",
-		Rand:      rand.New(rand.NewSource(time.Now().UnixNano())),
-		// Rand: rand.New(rand.NewSource(1)),
+		Rand:      rand.New(rand.NewSource(seed)),
 	}
 }
 
@@ -231,14 +237,21 @@ func (b *BenchClient) ActionLSet() {
 		return
 	}
 
-	i := b.Rand.Intn(len(b.List))
+	index := int64(b.Rand.Intn(len(b.List)))
 	s := b.String()
-	b.List[i] = s
+	b.List[index] = s
 
-	fmt.Printf("LSet %d %s\n", i, s)
+	virtualIndex := index
+
+	// rand negative
+	if b.Rand.Intn(2) == 0 {
+		virtualIndex = -(int64(len(b.List)) - int64(index))
+	}
+
+	fmt.Printf("LSet %d virtual %d %s\n", index, virtualIndex, s)
 	fmt.Printf("List %v\n", b.List)
 
-	ok, err := b.Client.LSET(b.TableName, int64(i), s)
+	ok, err := b.Client.LSET(b.TableName, virtualIndex, s)
 	b.AssertErrNil(err)
 
 	if !ok {
@@ -248,7 +261,7 @@ func (b *BenchClient) ActionLSet() {
 	b.CheckEqual()
 }
 
-func (b *BenchClient) ActionLRem() {
+func (b *BenchClient) ActionLRem0() {
 	if len(b.List) == 0 {
 		return
 	}
@@ -267,6 +280,102 @@ func (b *BenchClient) ActionLRem() {
 	fmt.Printf("List %v\n", b.List)
 
 	_, ok, err := b.Client.LREM(b.TableName, 0, StringValue{s})
+	b.AssertErrNil(err)
+
+	if !ok {
+		panic("Not equal")
+	}
+
+	b.CheckEqual()
+}
+
+func (b *BenchClient) ActionLRem1() {
+	if len(b.List) == 0 {
+		return
+	}
+
+	i := b.Rand.Intn(len(b.List))
+	s := b.List[i]
+
+	count := b.Rand.Intn(3) + 1
+	rawCount := count
+	totalCount := int64(0)
+
+	for _, e := range b.List {
+		if e == s {
+			totalCount++
+		}
+	}
+
+	newList := make([]string, 0)
+	for _, e := range b.List {
+		if e == s && count > 0 {
+			count--
+		} else {
+			newList = append(newList, e)
+		}
+	}
+
+	fmt.Printf("LRem1 %d %s count %d/%d\n", i, s, rawCount, totalCount)
+	fmt.Printf("Lrem1 List %v newList %v\n", b.List, newList)
+
+	b.List = newList
+
+	_, ok, err := b.Client.LREM(b.TableName, int64(count), StringValue{s})
+	b.AssertErrNil(err)
+
+	if !ok {
+		panic("Not equal")
+	}
+
+	b.CheckEqual()
+}
+
+func reverse(s []string) []string {
+	for i := len(s)/2 - 1; i >= 0; i-- {
+		opp := len(s) - 1 - i
+		s[i], s[opp] = s[opp], s[i]
+	}
+	return s
+}
+
+func (b *BenchClient) ActionLRemN1() {
+	if len(b.List) == 0 {
+		return
+	}
+
+	index := b.Rand.Intn(len(b.List))
+	s := b.List[index]
+
+	count := b.Rand.Intn(3) + 1
+	rawCount := count
+	totalCount := int64(0)
+
+	for _, e := range b.List {
+		if e == s {
+			totalCount++
+		}
+	}
+
+	newList := make([]string, 0)
+	for i := len(b.List) - 1; i >= 0; i-- {
+		e := b.List[i]
+		if e == s && count > 0 {
+			count--
+		} else {
+			newList = append(newList, e)
+		}
+	}
+
+	// reverse newList
+	newList = reverse(newList)
+
+	fmt.Printf("LRemN1 %d %s count %d/%d\n", index, s, rawCount, totalCount)
+	fmt.Printf("LremN1 List %v newList %v\n", b.List, newList)
+
+	b.List = newList
+
+	_, ok, err := b.Client.LREM(b.TableName, -int64(count), StringValue{s})
 	b.AssertErrNil(err)
 
 	if !ok {
@@ -337,7 +446,7 @@ func (b *BenchClient) ActionLLen() {
 }
 
 func (b *BenchClient) Step() bool {
-	switch b.Rand.Intn(15) {
+	switch b.Rand.Intn(StepActionMax) {
 	case StepActionLPush:
 		b.ActionLPush()
 	case StepActionRPush:
@@ -352,8 +461,12 @@ func (b *BenchClient) Step() bool {
 		b.ActionLIndex()
 	case StepActionLSet:
 		b.ActionLSet()
-	case StepActionLRem:
-		b.ActionLRem()
+	case StepActionLRem0:
+		b.ActionLRem0()
+	case StepActionLRem1:
+		b.ActionLRem1()
+	case StepActionLRemN1:
+		b.ActionLRemN1()
 	case StepActionLTrim:
 		b.ActionLTrim()
 	case StepActionRPopLPush:

@@ -598,6 +598,10 @@ func (c Client) getLRemItems(key string, member string, count int64) (newItems [
 	}
 
 	if count > 0 {
+		if count > int64(len(items)) {
+			count = int64(len(items))
+		}
+
 		sort.Slice(items, func(i, j int) bool {
 			return items[i][c.sortKeyNum].(*types.AttributeValueMemberN).Value < items[j][c.sortKeyNum].(*types.AttributeValueMemberN).Value
 		})
@@ -607,6 +611,12 @@ func (c Client) getLRemItems(key string, member string, count int64) (newItems [
 	sort.Slice(items, func(i, j int) bool {
 		return items[i][c.sortKeyNum].(*types.AttributeValueMemberN).Value > items[j][c.sortKeyNum].(*types.AttributeValueMemberN).Value
 	})
+
+	count = -count
+
+	if count > int64(len(items)) {
+		count = int64(len(items))
+	}
 
 	return items[:count], nil
 }
