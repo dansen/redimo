@@ -497,15 +497,12 @@ func (c Client) LSET(key string, index int64, element string) (ok bool, err erro
 }
 
 func (c Client) lGeneralRangeWithItemsByMember(key string,
-	offset int64, count int64,
+	start int64, end int64,
 	forward bool, member string) (elements []ReturnValue, items []map[string]types.AttributeValue, err error) {
 	llen, err := c.LLEN(key)
 	if err != nil {
 		return elements, items, err
 	}
-
-	start := offset
-	end := offset + count - 1
 
 	if start < 0 {
 		start = llen + start
@@ -527,8 +524,8 @@ func (c Client) lGeneralRangeWithItemsByMember(key string,
 		return elements, items, nil
 	}
 
-	count = end - start + 1
-	return c.lGeneralRangeWithItemsByMember_(key, offset, count, forward, member)
+	count := end - start + 1
+	return c.lGeneralRangeWithItemsByMember_(key, start, count, forward, member)
 }
 
 func (c Client) lGeneralRangeWithItemsByMember_(key string, offset int64, count int64,

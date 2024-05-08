@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"math/rand"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -27,13 +26,23 @@ type BenchClient struct {
 	List      []string
 	Client    Client
 	TableName string
+	Rand      *rand.Rand
 }
 
 const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 
-func stringWithCharset(length int64, charset string) string {
-	seed := rand.NewSource(time.Now().UnixNano())
-	r := rand.New(seed)
+func TestSingleThread(t *testing.T) {
+	c := newBenchClient(t)
+
+	for i := 0; i < 1000; i++ {
+		if !c.Step() {
+			break
+		}
+	}
+}
+
+func (bc *BenchClient) stringWithCharset(length int64, charset string) string {
+	r := bc.Rand
 	b := make([]byte, length)
 	for i := range b {
 		b[i] = charset[r.Intn(len(charset))]
@@ -41,14 +50,19 @@ func stringWithCharset(length int64, charset string) string {
 	return string(b)
 }
 
-func String() string {
-	length := rand.Int63()%5 + 3
-	return stringWithCharset(length, charset)
+func (b *BenchClient) String() string {
+	length := b.Rand.Int63()%5 + 3
+	return b.stringWithCharset(length, charset)
 }
 
 func newBenchClient(t *testing.T) *BenchClient {
 	c := newClient(t)
-	return &BenchClient{Client: c, TableName: "l1"}
+	return &BenchClient{
+		Client:    c,
+		TableName: "l1",
+		// Rand:      rand.New(rand.NewSource(time.Now().UnixNano())),
+		Rand: rand.New(rand.NewSource(1)),
+	}
 }
 
 func (b *BenchClient) AssertErrNil(err error) {
@@ -77,7 +91,7 @@ func (b *BenchClient) ActionLPush() {
 		return
 	}
 
-	s := String()
+	s := b.String()
 	b.List = append([]string{s}, b.List...)
 	fmt.Printf("LPush %s\n", s)
 	fmt.Printf("List %v\n", b.List)
@@ -92,7 +106,7 @@ func (b *BenchClient) ActionRPush() {
 		return
 	}
 
-	s := String()
+	s := b.String()
 	b.List = append(b.List, s)
 	fmt.Printf("RPush %s\n", s)
 	fmt.Printf("List %v\n", b.List)
@@ -103,11 +117,33 @@ func (b *BenchClient) ActionRPush() {
 }
 
 func (b *BenchClient) ActionLPop() {
-	print("LPop\n")
+	if len(b.List) == 0 {
+		return
+	}
+
+	s := b.List[0]
+	b.List = b.List[1:]
+	fmt.Printf("LPop %s\n", s)
+	fmt.Printf("List %v\n", b.List)
+
+	_, err := b.Client.LPOP(b.TableName)
+	b.AssertErrNil(err)
+	b.CheckEqual()
 }
 
 func (b *BenchClient) ActionRPop() {
-	print("RPop\n")
+	if len(b.List) == 0 {
+		return
+	}
+
+	s := b.List[len(b.List)-1]
+	b.List = b.List[:len(b.List)-1]
+	fmt.Printf("RPop %s\n", s)
+	fmt.Printf("List %v\n", b.List)
+
+	_, err := b.Client.RPOP(b.TableName)
+	b.AssertErrNil(err)
+	b.CheckEqual()
 }
 
 func (b *BenchClient) ActionLRange() {
@@ -115,15 +151,71 @@ func (b *BenchClient) ActionLRange() {
 }
 
 func (b *BenchClient) ActionLIndex() {
-	print("LIndex\n")
+	if len(b.List) == 0 {
+		return
+	}
+
+	i := b.Rand.Intn(len(b.List))
+	s := b.List[i]
+
+	fmt.Printf("LIndex %d %s\n", i, s)
+
+	element, err := b.Client.LINDEX(b.TableName, int64(i))
+	b.AssertErrNil(err)
+
+	if element.String() != s {
+		panic("Not equal")
+	}
 }
 
 func (b *BenchClient) ActionLSet() {
-	print("LSet\n")
+	if len(b.List) == 0 {
+		return
+	}
+
+	i := b.Rand.Intn(len(b.List))
+	s := b.String()
+	b.List[i] = s
+
+	fmt.Printf("LSet %d %s\n", i, s)
+	fmt.Printf("List %v\n", b.List)
+
+	ok, err := b.Client.LSET(b.TableName, int64(i), s)
+	b.AssertErrNil(err)
+
+	if !ok {
+		panic("Not equal")
+	}
+
+	b.CheckEqual()
 }
 
 func (b *BenchClient) ActionLRem() {
-	print("LRem\n")
+	if len(b.List) == 0 {
+		return
+	}
+
+	i := b.Rand.Intn(len(b.List))
+	s := b.List[i]
+	newList := make([]string, 0)
+	for _, e := range b.List {
+		if e != s {
+			newList = append(newList, e)
+		}
+	}
+	b.List = newList
+
+	fmt.Printf("LRem %d %s\n", i, s)
+	fmt.Printf("List %v\n", b.List)
+
+	_, ok, err := b.Client.LREM(b.TableName, 0, StringValue{s})
+	b.AssertErrNil(err)
+
+	if !ok {
+		panic("Not equal")
+	}
+
+	b.CheckEqual()
 }
 
 func (b *BenchClient) ActionLTrim() {
@@ -139,7 +231,7 @@ func (b *BenchClient) ActionLLen() {
 }
 
 func (b *BenchClient) Step() bool {
-	switch rand.Intn(10) {
+	switch b.Rand.Intn(10) {
 	case StepActionLPush:
 		b.ActionLPush()
 	case StepActionRPush:
@@ -165,16 +257,6 @@ func (b *BenchClient) Step() bool {
 	}
 
 	return true
-}
-
-func TestSingleThread(t *testing.T) {
-	c := newBenchClient(t)
-
-	for i := 0; i < 1000; i++ {
-		if !c.Step() {
-			break
-		}
-	}
 }
 
 func TestLBasics(t *testing.T) {
