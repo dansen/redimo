@@ -3,7 +3,9 @@ package redimo
 import (
 	"fmt"
 	"math/rand"
+	"sync"
 	"testing"
+	"time"
 )
 
 const (
@@ -28,10 +30,11 @@ const (
 )
 
 type BenchClient struct {
-	List      []string
-	Client    Client
-	TableName string
-	Rand      *rand.Rand
+	List        []string
+	Client      Client
+	TableName   string
+	Rand        *rand.Rand
+	EnableCheck bool
 }
 
 const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
@@ -44,6 +47,30 @@ func TestSingleThread(t *testing.T) {
 			break
 		}
 	}
+}
+
+func RunThread(c *BenchClient, wg *sync.WaitGroup) {
+	for i := 0; i < 4000; i++ {
+		if !c.Step() {
+			break
+		}
+	}
+
+	wg.Done()
+}
+
+func TestMultiThread(t *testing.T) {
+	c := newBenchClient(t)
+	c.EnableCheck = false
+
+	wg := new(sync.WaitGroup)
+
+	for i := 0; i < 3; i++ {
+		wg.Add(1)
+		go RunThread(c, wg)
+	}
+
+	wg.Wait()
 }
 
 func (bc *BenchClient) stringWithCharset(length int64, charset string) string {
@@ -63,34 +90,40 @@ func (b *BenchClient) String() string {
 func newBenchClient(t *testing.T) *BenchClient {
 	c := newClient(t)
 
-	// seed := time.Now().UnixNano()
-	seed := int64(1715156636706749400)
+	seed := time.Now().UnixNano()
+	// seed := int64(1715156636706749400)
 	fmt.Printf("Seed %d\n", seed)
 
 	return &BenchClient{
-		Client:    c,
-		TableName: "l1",
-		Rand:      rand.New(rand.NewSource(seed)),
+		Client:      c,
+		TableName:   "l1",
+		Rand:        rand.New(rand.NewSource(seed)),
+		EnableCheck: true,
 	}
 }
 
 func (b *BenchClient) AssertErrNil(err error) {
 	if err != nil {
+		fmt.Printf("Error %v\n", err)
 		panic(err)
 	}
 }
 
 func (b *BenchClient) CheckEqual() {
+	if !b.EnableCheck {
+		return
+	}
+
 	elements, err := b.Client.LRANGE(b.TableName, 0, -1)
 	b.AssertErrNil(err)
 
 	if len(elements) != len(b.List) {
-		panic("Not equal")
+		b.Panic("Not equal")
 	}
 
 	for i, e := range elements {
 		if e.String() != b.List[i] {
-			panic("Not equal")
+			b.Panic("Not equal")
 		}
 	}
 }
@@ -197,12 +230,14 @@ func (b *BenchClient) ActionLRange() {
 	b.AssertErrNil(err)
 
 	if len(elements) != len(rangeList) {
-		panic("Not equal")
+		b.Panic("Not equal")
 	}
 
-	for i, e := range elements {
-		if e.String() != rangeList[i] {
-			panic("Not equal")
+	if b.EnableCheck {
+		for i, e := range elements {
+			if e.String() != rangeList[i] {
+				b.Panic("Not equal")
+			}
 		}
 	}
 }
@@ -228,7 +263,7 @@ func (b *BenchClient) ActionLIndex() {
 	b.AssertErrNil(err)
 
 	if element.String() != s {
-		panic("Not equal")
+		b.Panic("Not equal")
 	}
 }
 
@@ -255,7 +290,7 @@ func (b *BenchClient) ActionLSet() {
 	b.AssertErrNil(err)
 
 	if !ok {
-		panic("Not equal")
+		b.Panic("Not equal")
 	}
 
 	b.CheckEqual()
@@ -283,7 +318,7 @@ func (b *BenchClient) ActionLRem0() {
 	b.AssertErrNil(err)
 
 	if !ok {
-		panic("Not equal")
+		b.Panic("Not equal")
 	}
 
 	b.CheckEqual()
@@ -325,7 +360,7 @@ func (b *BenchClient) ActionLRem1() {
 	b.AssertErrNil(err)
 
 	if !ok {
-		panic("Not equal")
+		b.Panic("Not equal")
 	}
 
 	b.CheckEqual()
@@ -379,7 +414,7 @@ func (b *BenchClient) ActionLRemN1() {
 	b.AssertErrNil(err)
 
 	if !ok {
-		panic("Not equal")
+		b.Panic("Not equal")
 	}
 
 	b.CheckEqual()
@@ -445,10 +480,18 @@ func (b *BenchClient) ActionRPopLPush() {
 	b.AssertErrNil(err)
 
 	if element.String() != s {
-		panic("Not equal")
+		b.Panic("Not equal")
 	}
 
 	b.CheckEqual()
+}
+
+func (b *BenchClient) Panic(v interface{}) {
+	if !b.EnableCheck {
+		return
+	}
+
+	panic(v)
 }
 
 func (b *BenchClient) ActionLLen() {
@@ -456,7 +499,7 @@ func (b *BenchClient) ActionLLen() {
 	b.AssertErrNil(err)
 
 	if count != int64(len(b.List)) {
-		panic("Not equal")
+		b.Panic("Not equal")
 	}
 }
 

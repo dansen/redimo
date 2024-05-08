@@ -49,15 +49,9 @@ func (c Client) LPOP(key string) (element ReturnValue, err error) {
 	}
 
 	// delete item 0
-	builder := newExpresionBuilder()
-	builder.addConditionEquality(c.partitionKey, StringValue{key})
-
 	_, err = c.ddbClient.DeleteItem(context.TODO(), &dynamodb.DeleteItemInput{
-		ConditionExpression:       builder.conditionExpression(),
-		ExpressionAttributeNames:  builder.expressionAttributeNames(),
-		ExpressionAttributeValues: builder.expressionAttributeValues(),
-		Key:                       keyDef{pk: key, sk: items[0][c.sortKey].(*types.AttributeValueMemberS).Value}.toAV(c),
-		TableName:                 aws.String(c.tableName),
+		Key:       keyDef{pk: key, sk: items[0][c.sortKey].(*types.AttributeValueMemberS).Value}.toAV(c),
+		TableName: aws.String(c.tableName),
 	})
 
 	if err != nil {
@@ -391,21 +385,20 @@ func (c Client) RPOP(key string) (element ReturnValue, err error) {
 	}
 
 	// delete item 0
-	builder := newExpresionBuilder()
-	builder.addConditionEquality(c.partitionKey, StringValue{key})
-
 	sk := items[0][c.sortKey].(*types.AttributeValueMemberS).Value
 
-	_, err = c.ddbClient.DeleteItem(context.TODO(), &dynamodb.DeleteItemInput{
-		ConditionExpression:       builder.conditionExpression(),
-		ExpressionAttributeNames:  builder.expressionAttributeNames(),
-		ExpressionAttributeValues: builder.expressionAttributeValues(),
-		Key:                       keyDef{pk: key, sk: sk}.toAV(c),
-		TableName:                 aws.String(c.tableName),
+	result, err := c.ddbClient.DeleteItem(context.TODO(), &dynamodb.DeleteItemInput{
+		Key:          keyDef{pk: key, sk: sk}.toAV(c),
+		TableName:    aws.String(c.tableName),
+		ReturnValues: types.ReturnValueAllOld,
 	})
 
 	if err != nil {
 		return element, err
+	}
+
+	if result.Attributes == nil {
+		return element, nil
 	}
 
 	element = parseItem(items[0], c).val
@@ -642,16 +635,11 @@ func (c Client) LREM(key string, count int64, vElement interface{}) (newLength i
 
 	// delete [count] item
 	for i := int64(0); i < count; i++ {
-		builder := newExpresionBuilder()
-		builder.addConditionEquality(c.partitionKey, StringValue{key})
 		item := items[i]
 
 		_, err = c.ddbClient.DeleteItem(context.TODO(), &dynamodb.DeleteItemInput{
-			ConditionExpression:       builder.conditionExpression(),
-			ExpressionAttributeNames:  builder.expressionAttributeNames(),
-			ExpressionAttributeValues: builder.expressionAttributeValues(),
-			Key:                       keyDef{pk: key, sk: item[c.sortKey].(*types.AttributeValueMemberS).Value}.toAV(c),
-			TableName:                 aws.String(c.tableName),
+			Key:       keyDef{pk: key, sk: item[c.sortKey].(*types.AttributeValueMemberS).Value}.toAV(c),
+			TableName: aws.String(c.tableName),
 		})
 
 		if err != nil {
