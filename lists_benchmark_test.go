@@ -15,9 +15,9 @@ const (
 	StepActionLIndex // negative test
 	StepActionLSet   // negative test
 	StepActionLRem0
-	StepActionLRem1
-	StepActionLRemN1
-	StepActionLTrim
+	StepActionLRem1  // negative test
+	StepActionLRemN1 // negative test
+	StepActionLTrim  // negative test
 	StepActionRPopLPush
 	StepActionLLen
 	StepActionLPush1
@@ -390,8 +390,10 @@ func (b *BenchClient) ActionLTrim() {
 		return
 	}
 
-	start := b.Rand.Intn(len(b.List))
-	end := b.Rand.Intn(len(b.List))
+	llen := int64(len(b.List))
+
+	start := int64(b.Rand.Intn(len(b.List)))
+	end := int64(b.Rand.Intn(len(b.List)))
 
 	if start > end {
 		start, end = end, start
@@ -399,17 +401,30 @@ func (b *BenchClient) ActionLTrim() {
 
 	newList := make([]string, 0)
 	for i, e := range b.List {
-		if i >= start && i <= end {
+		if int64(i) >= start && int64(i) <= end {
 			newList = append(newList, e)
 		}
 	}
 
 	b.List = newList
 
-	fmt.Printf("LTrim %d %d\n", start, end)
+	virtualStart := start
+	virtualEnd := end
+
+	// rand negative
+	if b.Rand.Intn(2) == 0 {
+		virtualStart = -(llen - int64(start))
+	}
+
+	// rand negative
+	if b.Rand.Intn(2) == 0 {
+		virtualEnd = -(llen - int64(end))
+	}
+
+	fmt.Printf("LTrim %d %d virtual %d %d\n", start, end, virtualStart, virtualEnd)
 	fmt.Printf("List %v\n", b.List)
 
-	_, err := b.Client.LTRIM(b.TableName, int64(start), int64(end))
+	_, err := b.Client.LTRIM(b.TableName, int64(virtualStart), int64(virtualEnd))
 	b.AssertErrNil(err)
 	b.CheckEqual()
 }
