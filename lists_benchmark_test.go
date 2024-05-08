@@ -157,24 +157,44 @@ func (b *BenchClient) ActionLRange() {
 		return
 	}
 
-	start := b.Rand.Intn(len(b.List))
-	end := b.Rand.Intn(len(b.List))
+	start := int64(b.Rand.Intn(len(b.List)))
+	end := int64(b.Rand.Intn(len(b.List)))
 
 	if start > end {
 		start, end = end, start
 	}
 
-	fmt.Printf("LRange %d %d\n", start, end)
+	virtualStart := start
+	virtualEnd := end
+	llen := int64(len(b.List))
 
-	elements, err := b.Client.LRANGE(b.TableName, int64(start), int64(end))
+	// rand negative
+	if b.Rand.Intn(2) == 0 {
+		virtualStart = -(llen - start)
+	}
+
+	// rand negative
+	if b.Rand.Intn(2) == 0 {
+		virtualEnd = -(llen - end)
+	}
+
+	rangeList := make([]string, 0)
+	for i := start; i <= end; i++ {
+		rangeList = append(rangeList, b.List[i])
+	}
+
+	fmt.Printf("LRange %d %d virtual %d %d\n", start, end, virtualStart, virtualEnd)
+	fmt.Printf("Range list %v\n", rangeList)
+
+	elements, err := b.Client.LRANGE(b.TableName, virtualStart, virtualEnd)
 	b.AssertErrNil(err)
 
-	if len(elements) != end-start+1 {
+	if len(elements) != len(rangeList) {
 		panic("Not equal")
 	}
 
 	for i, e := range elements {
-		if e.String() != b.List[start+i] {
+		if e.String() != rangeList[i] {
 			panic("Not equal")
 		}
 	}
