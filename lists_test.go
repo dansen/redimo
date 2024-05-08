@@ -34,7 +34,7 @@ const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 func TestSingleThread(t *testing.T) {
 	c := newBenchClient(t)
 
-	for i := 0; i < 1000; i++ {
+	for i := 0; i < 10000; i++ {
 		if !c.Step() {
 			break
 		}
@@ -151,7 +151,31 @@ func (b *BenchClient) ActionRPop() {
 }
 
 func (b *BenchClient) ActionLRange() {
-	print("LRange\n")
+	if len(b.List) == 0 {
+		return
+	}
+
+	start := b.Rand.Intn(len(b.List))
+	end := b.Rand.Intn(len(b.List))
+
+	if start > end {
+		start, end = end, start
+	}
+
+	fmt.Printf("LRange %d %d\n", start, end)
+
+	elements, err := b.Client.LRANGE(b.TableName, int64(start), int64(end))
+	b.AssertErrNil(err)
+
+	if len(elements) != end-start+1 {
+		panic("Not equal")
+	}
+
+	for i, e := range elements {
+		if e.String() != b.List[start+i] {
+			panic("Not equal")
+		}
+	}
 }
 
 func (b *BenchClient) ActionLIndex() {
@@ -252,15 +276,38 @@ func (b *BenchClient) ActionLTrim() {
 }
 
 func (b *BenchClient) ActionRPopLPush() {
-	print("RPopLPush\n")
+	if len(b.List) == 0 {
+		return
+	}
+
+	s := b.List[len(b.List)-1]
+	b.List = b.List[:len(b.List)-1]
+	b.List = append([]string{s}, b.List...)
+
+	fmt.Printf("RPopLPush %s\n", s)
+	fmt.Printf("List %v\n", b.List)
+
+	element, err := b.Client.RPOPLPUSH(b.TableName, b.TableName)
+	b.AssertErrNil(err)
+
+	if element.String() != s {
+		panic("Not equal")
+	}
+
+	b.CheckEqual()
 }
 
 func (b *BenchClient) ActionLLen() {
-	print("LLen\n")
+	count, err := b.Client.LLEN(b.TableName)
+	b.AssertErrNil(err)
+
+	if count != int64(len(b.List)) {
+		panic("Not equal")
+	}
 }
 
 func (b *BenchClient) Step() bool {
-	switch b.Rand.Intn(10) {
+	switch b.Rand.Intn(11) {
 	case StepActionLPush:
 		b.ActionLPush()
 	case StepActionRPush:
