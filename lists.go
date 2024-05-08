@@ -389,7 +389,6 @@ func (c Client) RPOP(key string) (element ReturnValue, err error) {
 		return element, err
 	}
 
-	fmt.Printf("RPOP items: %v\n", items)
 	// delete item 0
 	builder := newExpresionBuilder()
 	builder.addConditionEquality(c.partitionKey, StringValue{key})
@@ -641,4 +640,91 @@ func (c Client) LREM(key string, count int64, vElement interface{}) (newLength i
 	return newLength, true, nil
 }
 
-// TODO LTRIM
+func (c Client) normalStartStop(llen int64, start int64, stop int64) (int64, int64) {
+	end := stop
+
+	if start < 0 {
+		start = llen + start
+	}
+
+	if end < 0 {
+		end = llen + end
+	}
+
+	if start < 0 {
+		start = 0
+	}
+
+	if end >= llen {
+		end = llen - 1
+	}
+
+	if start > end || start >= llen {
+		return -1, -1
+	}
+
+	return start, end
+}
+
+func (c Client) lDelete(key string, start int64, stop int64) (newLength int64, err error) {
+	llen, err := c.LLEN(key)
+	if err != nil {
+		return llen, err
+	}
+
+	if llen == 0 {
+		return
+	}
+
+	start, stop = c.normalStartStop(llen, start, stop)
+
+	if start == -1 {
+		return llen, nil
+	}
+
+	_, items, err := c.lGeneralRangeWithItems(key, 0, start-1, true, c.sortKeyNum)
+
+	if err != nil {
+		return llen, err
+	}
+
+	for _, item := range items {
+		_, err = c.ddbClient.DeleteItem(context.TODO(), &dynamodb.DeleteItemInput{
+			Key:       keyDef{pk: key, sk: item[c.sortKey].(*types.AttributeValueMemberS).Value}.toAV(c),
+			TableName: aws.String(c.tableName),
+		})
+
+		if err != nil {
+			return llen, err
+		}
+	}
+
+	llen, err = c.LLEN(key)
+	return llen, err
+}
+
+func (c Client) LTRIM(key string, start int64, stop int64) (newLength int64, err error) {
+	llen, err := c.LLEN(key)
+	if err != nil {
+		return llen, err
+	}
+
+	if llen == 0 {
+		return
+	}
+
+	start, stop = c.normalStartStop(llen, start, stop)
+
+	if start == -1 {
+		return llen, nil
+	}
+
+	llen, err = c.lDelete(key, 0, start-1)
+
+	if err != nil {
+		return llen, err
+	}
+
+	llen, err = c.lDelete(key, stop+1, llen-1)
+	return llen, err
+}
