@@ -75,6 +75,10 @@ func (b *BenchClient) CheckEqual() {
 	elements, err := b.Client.LRANGE(b.TableName, 0, -1)
 	b.AssertErrNil(err)
 
+	if len(elements) != len(b.List) {
+		panic("Not equal")
+	}
+
 	for i, e := range elements {
 		if e.String() != b.List[i] {
 			panic("Not equal")
@@ -219,7 +223,32 @@ func (b *BenchClient) ActionLRem() {
 }
 
 func (b *BenchClient) ActionLTrim() {
-	print("LTrim\n")
+	if len(b.List) == 0 {
+		return
+	}
+
+	start := b.Rand.Intn(len(b.List))
+	end := b.Rand.Intn(len(b.List))
+
+	if start > end {
+		start, end = end, start
+	}
+
+	newList := make([]string, 0)
+	for i, e := range b.List {
+		if i >= start && i <= end {
+			newList = append(newList, e)
+		}
+	}
+
+	b.List = newList
+
+	fmt.Printf("LTrim %d %d\n", start, end)
+	fmt.Printf("List %v\n", b.List)
+
+	_, err := b.Client.LTRIM(b.TableName, int64(start), int64(end))
+	b.AssertErrNil(err)
+	b.CheckEqual()
 }
 
 func (b *BenchClient) ActionRPopLPush() {

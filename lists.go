@@ -689,13 +689,11 @@ func (c Client) lDelete(key string, start int64, stop int64) (newLength int64, e
 		return llen, err
 	}
 
-	if llen == 0 {
-		return
+	if llen == 0 || stop < start {
+		return llen, nil
 	}
 
-	start, stop = c.normalStartStop(llen, start, stop)
-
-	if start == -1 {
+	if start < 0 || stop < 0 {
 		return llen, nil
 	}
 
@@ -705,6 +703,8 @@ func (c Client) lDelete(key string, start int64, stop int64) (newLength int64, e
 		return llen, err
 	}
 
+	removeCount := int64(0)
+
 	for _, item := range items {
 		_, err = c.ddbClient.DeleteItem(context.TODO(), &dynamodb.DeleteItemInput{
 			Key:       keyDef{pk: key, sk: item[c.sortKey].(*types.AttributeValueMemberS).Value}.toAV(c),
@@ -712,8 +712,10 @@ func (c Client) lDelete(key string, start int64, stop int64) (newLength int64, e
 		})
 
 		if err != nil {
-			return llen, err
+			return llen - removeCount, err
 		}
+
+		removeCount++
 	}
 
 	llen, err = c.LLEN(key)
@@ -736,12 +738,12 @@ func (c Client) LTRIM(key string, start int64, stop int64) (newLength int64, err
 		return llen, nil
 	}
 
-	llen, err = c.lDelete(key, 0, start-1)
+	llen, err = c.lDelete(key, stop+1, llen-1)
 
 	if err != nil {
 		return llen, err
 	}
 
-	llen, err = c.lDelete(key, stop+1, llen-1)
+	llen, err = c.lDelete(key, 0, start-1)
 	return llen, err
 }
