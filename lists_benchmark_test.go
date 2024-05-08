@@ -18,6 +18,10 @@ const (
 	StepActionLTrim
 	StepActionRPopLPush
 	StepActionLLen
+	StepActionLPush1
+	StepActionLPush2
+	StepActionRPush1
+	StepActionRPush2
 )
 
 type BenchClient struct {
@@ -305,7 +309,7 @@ func (b *BenchClient) ActionLLen() {
 }
 
 func (b *BenchClient) Step() bool {
-	switch b.Rand.Intn(11) {
+	switch b.Rand.Intn(15) {
 	case StepActionLPush:
 		b.ActionLPush()
 	case StepActionRPush:
@@ -328,6 +332,14 @@ func (b *BenchClient) Step() bool {
 		b.ActionRPopLPush()
 	case StepActionLLen:
 		b.ActionLLen()
+	case StepActionLPush1:
+		b.ActionLPush()
+	case StepActionLPush2:
+		b.ActionLPush()
+	case StepActionRPush1:
+		b.ActionRPush()
+	case StepActionRPush2:
+		b.ActionRPush()
 	}
 
 	return true
