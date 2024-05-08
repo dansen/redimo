@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -588,18 +589,37 @@ func (c Client) lGeneralRangeWithItemsByMember_(key string, offset int64, count 
 	return elements, items, nil
 }
 
+func (c Client) getLRemItems(key string, member string, count int64) (newItems []map[string]types.AttributeValue, err error) {
+	_, items, err := c.lGeneralRangeWithItemsByMember(key, 0, -1, true, member)
+
+	if err != nil {
+		return newItems, err
+	}
+
+	if count == 0 {
+		return items, nil
+	}
+
+	if count > 0 {
+		sort.Slice(items, func(i, j int) bool {
+			return items[i][c.sortKeyNum].(*types.AttributeValueMemberN).Value < items[j][c.sortKeyNum].(*types.AttributeValueMemberN).Value
+		})
+		return items[:count], nil
+	}
+
+	sort.Slice(items, func(i, j int) bool {
+		return items[i][c.sortKeyNum].(*types.AttributeValueMemberN).Value > items[j][c.sortKeyNum].(*types.AttributeValueMemberN).Value
+	})
+
+	return items[:count], nil
+}
+
 // LREM removes [count] items from the list [key] that match [vElement]
 func (c Client) LREM(key string, count int64, vElement interface{}) (newLength int64, success bool, err error) {
 	member := vElement.(StringValue).ToAV().(*types.AttributeValueMemberS).Value
 	var items []map[string]types.AttributeValue
 
-	if count == 0 {
-		_, items, err = c.lGeneralRangeWithItemsByMember(key, 0, -1, true, member)
-	} else if count > 0 {
-		_, items, err = c.lGeneralRangeWithItemsByMember(key, 0, count, true, member)
-	} else {
-		_, items, err = c.lGeneralRangeWithItemsByMember(key, -count, -1, true, member)
-	}
+	items, err = c.getLRemItems(key, member, count)
 
 	if err != nil || len(items) == 0 {
 		return 0, false, err
@@ -682,7 +702,7 @@ func (c Client) lDelete(key string, start int64, stop int64) (newLength int64, e
 		return llen, nil
 	}
 
-	_, items, err := c.lGeneralRangeWithItems(key, 0, start-1, true, c.sortKeyNum)
+	_, items, err := c.lGeneralRangeWithItems(key, start, stop-start+1, true, c.sortKeyNum)
 
 	if err != nil {
 		return llen, err
