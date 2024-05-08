@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math/rand"
 	"testing"
+	"time"
 )
 
 const (
@@ -11,8 +12,8 @@ const (
 	StepActionRPush
 	StepActionLPop
 	StepActionRPop
-	StepActionLRange
-	StepActionLIndex
+	StepActionLRange // negative test ok
+	StepActionLIndex // negative test
 	StepActionLSet
 	StepActionLRem
 	StepActionLTrim
@@ -62,8 +63,8 @@ func newBenchClient(t *testing.T) *BenchClient {
 	return &BenchClient{
 		Client:    c,
 		TableName: "l1",
-		// Rand:      rand.New(rand.NewSource(time.Now().UnixNano())),
-		Rand: rand.New(rand.NewSource(1)),
+		Rand:      rand.New(rand.NewSource(time.Now().UnixNano())),
+		// Rand: rand.New(rand.NewSource(1)),
 	}
 }
 
@@ -205,12 +206,19 @@ func (b *BenchClient) ActionLIndex() {
 		return
 	}
 
-	i := b.Rand.Intn(len(b.List))
-	s := b.List[i]
+	index := int64(b.Rand.Intn(len(b.List)))
+	s := b.List[index]
 
-	fmt.Printf("LIndex %d %s\n", i, s)
+	virtualIndex := index
 
-	element, err := b.Client.LINDEX(b.TableName, int64(i))
+	// rand negative
+	if b.Rand.Intn(2) == 0 {
+		virtualIndex = -(int64(len(b.List)) - int64(index))
+	}
+
+	fmt.Printf("LIndex %d virtual %d %s\n", index, virtualIndex, s)
+
+	element, err := b.Client.LINDEX(b.TableName, int64(virtualIndex))
 	b.AssertErrNil(err)
 
 	if element.String() != s {
